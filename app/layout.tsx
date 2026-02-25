@@ -7,8 +7,8 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: {
-    default: 'DSS — Driving School Software',
-    template: '%s | DSS',
+    default: 'HelixDriving',
+    template: '%s | HelixDriving',
   },
   description: 'Complete management platform for driving schools.',
 }

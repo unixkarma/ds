@@ -28,6 +28,7 @@ export interface User {
   role: UserRole
   first_name: string
   last_name: string
+  email: string
   phone: string
   date_of_birth: string | null
   created_at: string
@@ -68,6 +69,10 @@ export interface Instructor {
 
 export interface InstructorWithUser extends Instructor {
   user: User
+}
+
+export interface InstructorWithUserAndAvailability extends InstructorWithUser {
+  availability: Availability[]
 }
 
 // ── Vehicles ─────────────────────────────────────────────────

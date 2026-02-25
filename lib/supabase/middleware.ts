@@ -33,9 +33,15 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
-  // Public paths that don't require authentication
-  const publicPaths = ['/login', '/register', '/forgot-password']
+  // Paths that require no session (anyone can visit)
+  const publicPaths = ['/login', '/register', '/forgot-password', '/auth/callback']
   const isPublicPath = publicPaths.some((p) => pathname.startsWith(p))
+
+  // Paths where we should NOT auto-redirect logged-in users away.
+  // /auth/update-password is reached after exchanging a reset token — the user
+  // now has a session but still needs to complete the password-update flow.
+  const guestOnlyPaths = ['/login', '/register', '/forgot-password']
+  const isGuestOnlyPath = guestOnlyPaths.some((p) => pathname.startsWith(p))
 
   // If not authenticated and not on a public path → redirect to login
   if (!user && !isPublicPath) {
@@ -44,10 +50,17 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url)
   }
 
-  // If authenticated and on a public auth path → redirect to dashboard
-  if (user && isPublicPath) {
+  // If authenticated and on a guest-only path → redirect to the right home
+  if (user && isGuestOnlyPath) {
+    const { data: profile } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
+    url.pathname =
+      profile?.role === 'student' || profile?.role === 'parent' ? '/student' : '/dashboard'
     return NextResponse.redirect(url)
   }
 
