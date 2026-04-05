@@ -10,6 +10,8 @@ import {
   Car,
   CreditCard,
   BarChart3,
+  Package,
+  Settings,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -21,8 +23,10 @@ const navItems = [
   { href: '/dashboard/instructors', label: 'Instructors', icon: UserCheck },
   { href: '/dashboard/schedule', label: 'Schedule', icon: Calendar },
   { href: '/dashboard/vehicles', label: 'Vehicles', icon: Car },
+  { href: '/dashboard/packages', label: 'Packages', icon: Package },
   { href: '/dashboard/payments', label: 'Payments', icon: CreditCard },
   { href: '/dashboard/reports', label: 'Reports', icon: BarChart3 },
+  { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ]
 
 interface SidebarProps {

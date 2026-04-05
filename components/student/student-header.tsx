@@ -1,9 +1,11 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { usePathname, useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { getInitials } from '@/lib/utils'
+import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -24,8 +26,14 @@ interface StudentHeaderProps {
   schoolName: string
 }
 
+const navLinks = [
+  { href: '/student', label: 'Dashboard', exact: true },
+  { href: '/student/packages', label: 'Buy Lessons' },
+]
+
 export function StudentHeader({ user, schoolName }: StudentHeaderProps) {
   const router = useRouter()
+  const pathname = usePathname()
 
   async function handleLogout() {
     const supabase = createClient()
@@ -40,12 +48,33 @@ export function StudentHeader({ user, schoolName }: StudentHeaderProps) {
   return (
     <header className="sticky top-0 z-10 border-b bg-background">
       <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
-        {/* Brand */}
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
-            H
+        {/* Brand + nav */}
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-primary text-primary-foreground flex items-center justify-center font-bold text-sm">
+              H
+            </div>
+            <span className="font-semibold text-sm hidden sm:block">{schoolName}</span>
           </div>
-          <span className="font-semibold text-sm">{schoolName}</span>
+          <nav className="flex items-center gap-1">
+            {navLinks.map(link => {
+              const isActive = link.exact ? pathname === link.href : pathname.startsWith(link.href)
+              return (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className={cn(
+                    'px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
+                    isActive
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted'
+                  )}
+                >
+                  {link.label}
+                </Link>
+              )
+            })}
+          </nav>
         </div>
 
         {/* User menu */}

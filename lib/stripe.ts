@@ -1,18 +1,16 @@
-// Stripe server-side client
-// Usage: import { stripe } from '@/lib/stripe'
+// Stripe client factory — each school has their own Stripe account.
+// Pass the school's secret key to create an instance for that school.
 import Stripe from 'stripe'
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('Missing STRIPE_SECRET_KEY environment variable')
+export function createStripeClient(secretKey: string): Stripe {
+  return new Stripe(secretKey, {
+    apiVersion: '2026-01-28.clover',
+    typescript: true,
+  })
 }
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2026-01-28.clover',
-  typescript: true,
-})
-
 // Helper: format cents to display string (e.g. 4999 → "$49.99")
-export function formatCurrency(cents: number, currency = 'usd'): string {
+export function formatStripeCents(cents: number, currency = 'usd'): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: currency.toUpperCase(),

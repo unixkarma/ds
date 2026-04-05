@@ -18,6 +18,10 @@ export interface School {
   email: string
   phone: string
   address: string
+  stripe_publishable_key: string | null
+  stripe_secret_key: string | null
+  stripe_webhook_secret: string | null
+  single_lesson_price_cents: number
   created_at: string
 }
 
@@ -48,6 +52,7 @@ export interface Student {
   status: StudentStatus
   total_lessons_purchased: number
   total_lessons_completed: number
+  lessons_remaining: number
   notes: string | null
   created_at?: string
 }
