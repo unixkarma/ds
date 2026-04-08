@@ -33,20 +33,25 @@ export async function PUT(
     .eq('id', user.id)
     .single()
 
-  if (!profile || profile.role !== 'admin') {
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'instructor')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   // Validate the instructor belongs to this school
   const { data: instructor } = await supabase
     .from('instructors')
-    .select('id')
+    .select('id, user_id')
     .eq('id', id)
     .eq('school_id', profile.school_id)
     .single()
 
   if (!instructor) {
     return NextResponse.json({ error: 'Instructor not found' }, { status: 404 })
+  }
+
+  // Instructors can only edit their own availability
+  if (profile.role === 'instructor' && instructor.user_id !== user!.id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const body = await request.json()

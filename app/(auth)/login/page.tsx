@@ -82,9 +82,11 @@ export default function LoginPage() {
       .eq('id', user.id)
       .single()
 
-    // Students and parents go to the student portal; everyone else to the admin dashboard
+    // Route to the correct portal based on role
     if (profile?.role === 'student' || profile?.role === 'parent') {
       router.push('/student')
+    } else if (profile?.role === 'instructor') {
+      router.push('/instructor')
     } else {
       router.push('/dashboard')
     }

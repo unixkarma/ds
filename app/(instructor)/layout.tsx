@@ -1,12 +1,12 @@
-// Student portal layout — simple top-nav, no sidebar.
-// Redirects non-students (admins/instructors) to the dashboard.
+// Instructor portal layout — top-nav, no sidebar.
+// Redirects non-instructors to the appropriate portal.
 
 import { redirect } from 'next/navigation'
 import { type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/server'
-import { StudentHeader } from '@/components/student/student-header'
+import { InstructorHeader } from '@/components/instructor/instructor-header'
 
-export default async function StudentLayout({ children }: { children: ReactNode }) {
+export default async function InstructorLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient()
   const {
     data: { user },
@@ -20,12 +20,11 @@ export default async function StudentLayout({ children }: { children: ReactNode 
     .eq('id', user.id)
     .single()
 
-  // Admins should use the dashboard, instructors should use their portal
-  if (!profile || profile.role === 'admin') {
+  if (!profile || profile.role !== 'instructor') {
+    if (profile?.role === 'student' || profile?.role === 'parent') {
+      redirect('/student')
+    }
     redirect('/dashboard')
-  }
-  if (profile.role === 'instructor') {
-    redirect('/instructor')
   }
 
   const { data: school } = await supabase
@@ -38,7 +37,7 @@ export default async function StudentLayout({ children }: { children: ReactNode 
 
   return (
     <div className="min-h-screen bg-muted/30">
-      <StudentHeader
+      <InstructorHeader
         user={{
           firstName: profile.first_name,
           lastName: profile.last_name,
@@ -46,7 +45,7 @@ export default async function StudentLayout({ children }: { children: ReactNode 
         }}
         schoolName={schoolName}
       />
-      <main className="max-w-4xl mx-auto px-4 py-8">
+      <main className="max-w-5xl mx-auto px-4 py-8">
         {children}
       </main>
     </div>

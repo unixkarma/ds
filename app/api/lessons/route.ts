@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  if (!profile || (profile.role !== 'admin' && profile.role !== 'instructor')) {
+  if (!profile || !['admin', 'instructor', 'student'].includes(profile.role)) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -73,6 +73,28 @@ export async function POST(request: NextRequest) {
 
   const { studentId, instructorId, scheduledAt, durationMinutes, vehicleId, notes } = parsed.data
   const schoolId = profile.school_id
+
+  // Students can only book lessons for themselves
+  if (profile.role === 'student') {
+    const { data: studentRecord } = await supabase
+      .from('students')
+      .select('id, lessons_remaining')
+      .eq('user_id', user!.id)
+      .single()
+
+    if (!studentRecord) {
+      return NextResponse.json({ error: 'Student record not found' }, { status: 404 })
+    }
+    if (studentRecord.id !== studentId) {
+      return NextResponse.json({ error: 'You can only book lessons for yourself' }, { status: 403 })
+    }
+    if (studentRecord.lessons_remaining <= 0) {
+      return NextResponse.json(
+        { error: 'No lessons remaining. Please purchase a package first.' },
+        { status: 400 }
+      )
+    }
+  }
 
   const lessonStart = new Date(scheduledAt)
   const lessonEnd = new Date(lessonStart.getTime() + durationMinutes * 60 * 1000)
