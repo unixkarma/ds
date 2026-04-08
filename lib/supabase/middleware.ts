@@ -34,13 +34,13 @@ export async function updateSession(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   // Paths that require no session (anyone can visit)
-  const publicPaths = ['/login', '/register', '/forgot-password', '/auth/callback']
+  const publicPaths = ['/login', '/register', '/register/student', '/forgot-password', '/auth/callback']
   const isPublicPath = publicPaths.some((p) => pathname.startsWith(p))
 
   // Paths where we should NOT auto-redirect logged-in users away.
   // /auth/update-password is reached after exchanging a reset token — the user
   // now has a session but still needs to complete the password-update flow.
-  const guestOnlyPaths = ['/login', '/register', '/forgot-password']
+  const guestOnlyPaths = ['/login', '/register', '/register/student', '/forgot-password']
   const isGuestOnlyPath = guestOnlyPaths.some((p) => pathname.startsWith(p))
 
   // If not authenticated and not on a public path → redirect to login
@@ -59,8 +59,13 @@ export async function updateSession(request: NextRequest) {
       .single()
 
     const url = request.nextUrl.clone()
-    url.pathname =
-      profile?.role === 'student' || profile?.role === 'parent' ? '/student' : '/dashboard'
+    if (profile?.role === 'student' || profile?.role === 'parent') {
+      url.pathname = '/student'
+    } else if (profile?.role === 'instructor') {
+      url.pathname = '/instructor'
+    } else {
+      url.pathname = '/dashboard'
+    }
     return NextResponse.redirect(url)
   }
 

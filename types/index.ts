@@ -18,6 +18,7 @@ export interface School {
   email: string
   phone: string
   address: string
+  registration_code: string
   stripe_publishable_key: string | null
   stripe_secret_key: string | null
   stripe_webhook_secret: string | null
@@ -31,9 +32,15 @@ export interface User {
   school_id: string
   role: UserRole
   first_name: string
+  middle_name: string
   last_name: string
   email: string
   phone: string
+  address: string
+  city: string
+  state: string
+  zip_code: string
+  gender: string
   date_of_birth: string | null
   created_at: string
 }
@@ -54,6 +61,18 @@ export interface Student {
   total_lessons_completed: number
   lessons_remaining: number
   notes: string | null
+  emergency_contact_name: string
+  emergency_contact_phone: string
+  emergency_contact_relationship: string
+  road_test_status: string
+  wears_glasses_contacts: string
+  medical_conditions: string
+  how_heard_about_us: string
+  has_learners_permit: boolean | null
+  permit_number: string
+  permit_issued_date: string | null
+  permit_expiration_date: string | null
+  school_referral: boolean
   created_at?: string
 }
 

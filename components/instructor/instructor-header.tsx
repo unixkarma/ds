@@ -4,8 +4,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
-import { getInitials } from '@/lib/utils'
-import { cn } from '@/lib/utils'
+import { getInitials, cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
@@ -17,7 +16,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-interface StudentHeaderProps {
+interface InstructorHeaderProps {
   user: {
     firstName: string
     lastName: string
@@ -27,12 +26,12 @@ interface StudentHeaderProps {
 }
 
 const navLinks = [
-  { href: '/student', label: 'Dashboard', exact: true },
-  { href: '/student/book', label: 'Book a Lesson' },
-  { href: '/student/packages', label: 'Buy Lessons' },
+  { href: '/instructor', label: 'Dashboard', exact: true },
+  { href: '/instructor/schedule', label: 'My Schedule' },
+  { href: '/instructor/availability', label: 'Availability' },
 ]
 
-export function StudentHeader({ user, schoolName }: StudentHeaderProps) {
+export function InstructorHeader({ user, schoolName }: InstructorHeaderProps) {
   const router = useRouter()
   const pathname = usePathname()
 
@@ -48,7 +47,7 @@ export function StudentHeader({ user, schoolName }: StudentHeaderProps) {
 
   return (
     <header className="sticky top-0 z-10 border-b bg-background">
-      <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between">
+      <div className="max-w-5xl mx-auto px-4 h-14 flex items-center justify-between">
         {/* Brand + nav */}
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-2">

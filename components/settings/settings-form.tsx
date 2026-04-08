@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Building2, CreditCard, Eye, EyeOff, CheckCircle2 } from 'lucide-react'
+import { Building2, CreditCard, Eye, EyeOff, CheckCircle2, Link2, Copy, Check } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -288,6 +288,46 @@ function StripeForm({ school }: { school: School }) {
   )
 }
 
+// ── Student registration link tab ─────────────────────────────
+
+function RegistrationLinkPanel({ school }: { school: School }) {
+  const [copied, setCopied] = useState(false)
+
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+  const registrationUrl = `${baseUrl}/register/student?school=${school.registration_code}`
+
+  function handleCopy() {
+    navigator.clipboard.writeText(registrationUrl)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-muted-foreground">
+        Share this link with prospective students so they can create their own accounts and register at your school.
+      </p>
+
+      <div className="flex items-center gap-2">
+        <Input
+          readOnly
+          value={registrationUrl}
+          className="font-mono text-sm"
+          onClick={(e) => (e.target as HTMLInputElement).select()}
+        />
+        <Button type="button" variant="outline" size="icon" onClick={handleCopy}>
+          {copied ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+        </Button>
+      </div>
+
+      <div className="text-xs text-muted-foreground space-y-1">
+        <p>Registration Code: <code className="bg-muted px-1 rounded">{school.registration_code}</code></p>
+        <p>Students who sign up through this link will automatically be added to your school.</p>
+      </div>
+    </div>
+  )
+}
+
 // ── Main settings form ────────────────────────────────────────
 
 export function SettingsForm({ school }: SettingsFormProps) {
@@ -301,6 +341,10 @@ export function SettingsForm({ school }: SettingsFormProps) {
         <TabsTrigger value="stripe" className="flex items-center gap-1.5">
           <CreditCard className="h-3.5 w-3.5" />
           Stripe
+        </TabsTrigger>
+        <TabsTrigger value="registration" className="flex items-center gap-1.5">
+          <Link2 className="h-3.5 w-3.5" />
+          Registration
         </TabsTrigger>
       </TabsList>
 
@@ -328,6 +372,20 @@ export function SettingsForm({ school }: SettingsFormProps) {
           </CardHeader>
           <CardContent>
             <StripeForm school={school} />
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="registration">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Student Registration Link</CardTitle>
+            <CardDescription>
+              Share this link so students can self-register at your school
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RegistrationLinkPanel school={school} />
           </CardContent>
         </Card>
       </TabsContent>
