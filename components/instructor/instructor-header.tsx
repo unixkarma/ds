@@ -29,6 +29,7 @@ const navLinks = [
   { href: '/instructor', label: 'Dashboard', exact: true },
   { href: '/instructor/schedule', label: 'My Schedule' },
   { href: '/instructor/availability', label: 'Availability' },
+  { href: '/instructor/earnings', label: 'Earnings' },
 ]
 
 export function InstructorHeader({ user, schoolName }: InstructorHeaderProps) {

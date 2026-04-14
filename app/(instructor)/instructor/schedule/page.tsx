@@ -5,6 +5,7 @@ import { getInstructorPortalData } from '@/lib/services/instructor-portal'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { LessonActions } from '@/components/instructor/lesson-actions'
 import type { LessonWithRelations, LessonStatus } from '@/types'
 
 const STATUS_BADGE: Record<LessonStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -103,6 +104,7 @@ function LessonTable({ lessons }: { lessons: LessonWithRelations[] }) {
             <th className="text-left pb-2 font-medium">Duration</th>
             <th className="text-left pb-2 font-medium">Vehicle</th>
             <th className="text-left pb-2 font-medium">Status</th>
+            <th className="text-left pb-2 font-medium">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y">
@@ -127,6 +129,9 @@ function LessonTable({ lessons }: { lessons: LessonWithRelations[] }) {
                   <Badge variant={STATUS_BADGE[lesson.status]}>
                     {lesson.status.replace('_', ' ')}
                   </Badge>
+                </td>
+                <td className="py-2.5">
+                  <LessonActions lessonId={lesson.id} status={lesson.status} />
                 </td>
               </tr>
             )

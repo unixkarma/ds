@@ -45,7 +45,7 @@ export async function PATCH(
   // Verify the lesson belongs to this school
   const { data: existing } = await supabase
     .from('lessons')
-    .select('id, status, instructor_id, student_id, duration_minutes, school_id')
+    .select('id, status, instructor_id, student_id, duration_minutes, school_id, sold_by, price_cents')
     .eq('id', id)
     .eq('school_id', profile.school_id)
     .single()
@@ -104,6 +104,59 @@ export async function PATCH(
   if (updates.durationMinutes !== undefined) lessonUpdates.duration_minutes = updates.durationMinutes
   if (updates.vehicleId !== undefined) lessonUpdates.vehicle_id = updates.vehicleId
   if (updates.notes !== undefined) lessonUpdates.notes = updates.notes
+
+  // ── Calculate instructor earnings when marking complete ─────
+  if (updates.status === 'completed' && existing.status !== 'completed') {
+    const { data: instructor } = await adminClient
+      .from('instructors')
+      .select('modality, hourly_rate_cents, commission_rate')
+      .eq('id', existing.instructor_id)
+      .single()
+
+    if (instructor) {
+      const hours = existing.duration_minutes / 60
+      let earningCents = 0
+
+      if (instructor.modality === 'independent') {
+        // Independent: lesson price minus commission
+        earningCents = Math.round(existing.price_cents - (existing.price_cents * Number(instructor.commission_rate)))
+      } else {
+        // School: hourly rate × hours
+        earningCents = Math.round(instructor.hourly_rate_cents * hours)
+      }
+
+      lessonUpdates.instructor_earning_cents = earningCents
+    }
+  }
+
+  // ── Track cancellation fees ─────────────────────────────────
+  if (updates.status === 'cancelled' && existing.status !== 'cancelled') {
+    // Determine who cancelled based on user role
+    let cancelledBy: string
+    if (profile.role === 'instructor') {
+      cancelledBy = 'instructor'
+    } else if (profile.role === 'student') {
+      cancelledBy = 'student'
+    } else {
+      cancelledBy = 'admin'
+    }
+    lessonUpdates.cancelled_by = cancelledBy
+
+    // Fetch school cancellation fee settings
+    if (cancelledBy !== 'admin') {
+      const { data: school } = await adminClient
+        .from('schools')
+        .select('student_cancellation_fee_cents, instructor_cancellation_fee_cents')
+        .eq('id', existing.school_id)
+        .single()
+
+      if (school) {
+        lessonUpdates.cancellation_fee_cents = cancelledBy === 'student'
+          ? school.student_cancellation_fee_cents
+          : school.instructor_cancellation_fee_cents
+      }
+    }
+  }
 
   const { error } = await adminClient
     .from('lessons')
