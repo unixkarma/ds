@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import { ChevronLeft } from 'lucide-react'
 
 import { getInstructorById } from '@/lib/services/instructors'
+import { getSchoolSettings } from '@/lib/services/settings'
 import { getFullName } from '@/lib/utils'
 import { InstructorForm } from '@/components/instructors/instructor-form'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -24,6 +25,8 @@ export default async function EditInstructorPage({
     notFound()
   }
 
+  const school = await getSchoolSettings()
+
   return (
     <div className="max-w-2xl">
       <Link
@@ -42,7 +45,10 @@ export default async function EditInstructorPage({
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <InstructorForm instructor={instructor} />
+          <InstructorForm
+            instructor={instructor}
+            schoolBasePriceCents={school?.single_lesson_price_cents ?? 0}
+          />
         </CardContent>
       </Card>
     </div>

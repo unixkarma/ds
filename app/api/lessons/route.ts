@@ -45,6 +45,7 @@ const createLessonSchema = z.object({
   durationMinutes: z.number().int().min(15).max(240).default(60),
   vehicleId: z.string().uuid().nullable().optional(),
   notes: z.string().optional(),
+  soldBy: z.enum(['school', 'instructor']).optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -71,8 +72,48 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { studentId, instructorId, scheduledAt, durationMinutes, vehicleId, notes } = parsed.data
+  const { studentId, instructorId, scheduledAt, durationMinutes, vehicleId, notes, soldBy } = parsed.data
   const schoolId = profile.school_id
+
+  // Determine sold_by: instructors creating lessons = 'instructor', otherwise 'school'
+  const resolvedSoldBy = soldBy ?? (profile.role === 'instructor' ? 'instructor' : 'school')
+
+  // Fetch school settings for booking limit and pricing
+  const { data: school } = await supabase
+    .from('schools')
+    .select('max_booking_days_ahead, single_lesson_price_cents')
+    .eq('id', schoolId)
+    .single()
+
+  // Enforce max booking days ahead
+  if (school) {
+    const maxDate = new Date()
+    maxDate.setDate(maxDate.getDate() + school.max_booking_days_ahead)
+    if (new Date(scheduledAt) > maxDate) {
+      return NextResponse.json(
+        { error: `Cannot book more than ${school.max_booking_days_ahead} days in advance.` },
+        { status: 400 }
+      )
+    }
+  }
+
+  // Fetch instructor for pricing
+  const { data: instructorRecord } = await supabase
+    .from('instructors')
+    .select('modality, hourly_rate_cents, lesson_price_cents, commission_rate')
+    .eq('id', instructorId)
+    .single()
+
+  // Calculate price_cents for this lesson
+  const hours = durationMinutes / 60
+  let priceCents = 0
+  if (instructorRecord) {
+    if (instructorRecord.modality === 'independent' && instructorRecord.lesson_price_cents) {
+      priceCents = Math.round(instructorRecord.lesson_price_cents * hours)
+    } else if (school) {
+      priceCents = Math.round(school.single_lesson_price_cents * hours)
+    }
+  }
 
   // Students can only book lessons for themselves
   if (profile.role === 'student') {
@@ -150,6 +191,8 @@ export async function POST(request: NextRequest) {
       scheduled_at: scheduledAt,
       duration_minutes: durationMinutes,
       notes: notes ?? null,
+      sold_by: resolvedSoldBy,
+      price_cents: priceCents,
     })
     .select(`
       *,

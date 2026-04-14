@@ -12,6 +12,12 @@ const updateInstructorSchema = z.object({
   licenseNumber: z.string().optional(),
   maxLessonsPerDay: z.number().int().min(1).max(20).optional(),
   isActive: z.boolean().optional(),
+  modality: z.enum(['school', 'independent']).optional(),
+  commissionRate: z.number().min(0).max(1).optional(),
+  hourlyRateCents: z.number().int().min(0).optional(),
+  lessonPriceCents: z.number().int().min(0).nullable().optional(),
+  usesSchoolVehicle: z.boolean().optional(),
+  vehicleMonthlyFeeCents: z.number().int().min(0).optional(),
 })
 
 export async function PATCH(
@@ -65,6 +71,12 @@ export async function PATCH(
   if (updates.licenseNumber !== undefined) instructorUpdates.license_number = updates.licenseNumber
   if (updates.maxLessonsPerDay !== undefined) instructorUpdates.max_lessons_per_day = updates.maxLessonsPerDay
   if (updates.isActive !== undefined) instructorUpdates.is_active = updates.isActive
+  if (updates.modality !== undefined) instructorUpdates.modality = updates.modality
+  if (updates.commissionRate !== undefined) instructorUpdates.commission_rate = updates.commissionRate
+  if (updates.hourlyRateCents !== undefined) instructorUpdates.hourly_rate_cents = updates.hourlyRateCents
+  if (updates.lessonPriceCents !== undefined) instructorUpdates.lesson_price_cents = updates.lessonPriceCents
+  if (updates.usesSchoolVehicle !== undefined) instructorUpdates.uses_school_vehicle = updates.usesSchoolVehicle
+  if (updates.vehicleMonthlyFeeCents !== undefined) instructorUpdates.vehicle_monthly_fee_cents = updates.vehicleMonthlyFeeCents
 
   const userUpdates: Record<string, unknown> = {}
   if (updates.firstName !== undefined) userUpdates.first_name = updates.firstName

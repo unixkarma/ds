@@ -23,6 +23,9 @@ export interface School {
   stripe_secret_key: string | null
   stripe_webhook_secret: string | null
   single_lesson_price_cents: number
+  student_cancellation_fee_cents: number
+  instructor_cancellation_fee_cents: number
+  max_booking_days_ahead: number
   created_at: string
 }
 
@@ -81,6 +84,9 @@ export interface StudentWithUser extends Student {
   parent?: User | null
 }
 
+// ── Instructor modality ──────────────────────────────────────
+export type InstructorModality = 'school' | 'independent'
+
 // ── Instructors ───────────────────────────────────────────────
 export interface Instructor {
   id: string
@@ -89,6 +95,12 @@ export interface Instructor {
   license_number: string
   is_active: boolean
   max_lessons_per_day: number
+  modality: InstructorModality
+  commission_rate: number
+  hourly_rate_cents: number
+  lesson_price_cents: number | null
+  uses_school_vehicle: boolean
+  vehicle_monthly_fee_cents: number
 }
 
 export interface InstructorWithUser extends Instructor {
@@ -110,6 +122,10 @@ export interface Vehicle {
   is_active: boolean
 }
 
+// ── Lesson sale origin ───────────────────────────────────────
+export type LessonSoldBy = 'school' | 'instructor'
+export type LessonCancelledBy = 'student' | 'instructor' | 'admin'
+
 // ── Lessons ───────────────────────────────────────────────────
 export interface Lesson {
   id: string
@@ -121,6 +137,11 @@ export interface Lesson {
   duration_minutes: number
   status: LessonStatus
   notes: string | null
+  sold_by: LessonSoldBy
+  price_cents: number
+  instructor_earning_cents: number
+  cancelled_by: LessonCancelledBy | null
+  cancellation_fee_cents: number
   created_at: string
 }
 

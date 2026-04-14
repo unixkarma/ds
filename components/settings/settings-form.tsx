@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Building2, CreditCard, Eye, EyeOff, CheckCircle2, Link2, Copy, Check } from 'lucide-react'
+import { Building2, CreditCard, Eye, EyeOff, CheckCircle2, Link2, Copy, Check, ShieldCheck } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -328,6 +328,126 @@ function RegistrationLinkPanel({ school }: { school: School }) {
   )
 }
 
+// ── Policies tab (cancellation fees + booking limit) ─────────
+
+const policiesSchema = z.object({
+  student_cancellation_fee_cents: z.string(),
+  instructor_cancellation_fee_cents: z.string(),
+  max_booking_days_ahead: z.string(),
+})
+
+type PoliciesValues = z.infer<typeof policiesSchema>
+
+function PoliciesForm({ school }: { school: School }) {
+  const [success, setSuccess] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const form = useForm<PoliciesValues>({
+    resolver: zodResolver(policiesSchema),
+    defaultValues: {
+      student_cancellation_fee_cents: String(school.student_cancellation_fee_cents / 100),
+      instructor_cancellation_fee_cents: String(school.instructor_cancellation_fee_cents / 100),
+      max_booking_days_ahead: String(school.max_booking_days_ahead),
+    },
+  })
+
+  async function onSubmit(values: PoliciesValues) {
+    setError(null)
+    setSuccess(false)
+
+    const res = await fetch('/api/settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        student_cancellation_fee_cents: Math.round(parseFloat(values.student_cancellation_fee_cents) * 100) || 0,
+        instructor_cancellation_fee_cents: Math.round(parseFloat(values.instructor_cancellation_fee_cents) * 100) || 0,
+        max_booking_days_ahead: parseInt(values.max_booking_days_ahead, 10) || 30,
+      }),
+    })
+
+    if (!res.ok) {
+      const data = await res.json()
+      setError(data.error ?? 'Failed to save settings')
+      return
+    }
+
+    setSuccess(true)
+    setTimeout(() => setSuccess(false), 3000)
+  }
+
+  return (
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+      {success && (
+        <Alert className="border-emerald-500 bg-emerald-50 text-emerald-800">
+          <CheckCircle2 className="h-4 w-4" />
+          <AlertDescription>Policy settings saved successfully.</AlertDescription>
+        </Alert>
+      )}
+      {error && (
+        <Alert variant="destructive">
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <div className="space-y-4">
+        <h4 className="text-sm font-medium">Cancellation Fees</h4>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="student_cancel_fee">Student Cancellation Fee ($)</Label>
+            <Input
+              id="student_cancel_fee"
+              type="number"
+              step="0.01"
+              min="0"
+              {...form.register('student_cancellation_fee_cents')}
+            />
+            <p className="text-xs text-muted-foreground">
+              Charged when a student cancels a lesson.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="instructor_cancel_fee">Instructor Cancellation Fee ($)</Label>
+            <Input
+              id="instructor_cancel_fee"
+              type="number"
+              step="0.01"
+              min="0"
+              {...form.register('instructor_cancellation_fee_cents')}
+            />
+            <p className="text-xs text-muted-foreground">
+              Deducted from instructor earnings when they cancel.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-1.5">
+        <h4 className="text-sm font-medium">Scheduling</h4>
+        <div className="max-w-[200px]">
+          <Label htmlFor="max_booking_days">Max Booking Days Ahead</Label>
+          <Input
+            id="max_booking_days"
+            type="number"
+            min="1"
+            max="365"
+            {...form.register('max_booking_days_ahead')}
+          />
+          <p className="text-xs text-muted-foreground mt-1">
+            Students and instructors can only book up to this many days in advance.
+          </p>
+        </div>
+      </div>
+
+      <div className="pt-2">
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting ? 'Saving...' : 'Save Policy Settings'}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
 // ── Main settings form ────────────────────────────────────────
 
 export function SettingsForm({ school }: SettingsFormProps) {
@@ -341,6 +461,10 @@ export function SettingsForm({ school }: SettingsFormProps) {
         <TabsTrigger value="stripe" className="flex items-center gap-1.5">
           <CreditCard className="h-3.5 w-3.5" />
           Stripe
+        </TabsTrigger>
+        <TabsTrigger value="policies" className="flex items-center gap-1.5">
+          <ShieldCheck className="h-3.5 w-3.5" />
+          Policies
         </TabsTrigger>
         <TabsTrigger value="registration" className="flex items-center gap-1.5">
           <Link2 className="h-3.5 w-3.5" />
@@ -372,6 +496,20 @@ export function SettingsForm({ school }: SettingsFormProps) {
           </CardHeader>
           <CardContent>
             <StripeForm school={school} />
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="policies">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Policies</CardTitle>
+            <CardDescription>
+              Cancellation fees and scheduling restrictions
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <PoliciesForm school={school} />
           </CardContent>
         </Card>
       </TabsContent>

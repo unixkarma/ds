@@ -3,11 +3,14 @@ import Link from 'next/link'
 import { ChevronLeft } from 'lucide-react'
 
 import { InstructorForm } from '@/components/instructors/instructor-form'
+import { getSchoolSettings } from '@/lib/services/settings'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 
 export const metadata: Metadata = { title: 'Add Instructor' }
 
-export default function NewInstructorPage() {
+export default async function NewInstructorPage() {
+  const school = await getSchoolSettings()
+
   return (
     <div className="max-w-2xl">
       <Link
@@ -26,7 +29,7 @@ export default function NewInstructorPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <InstructorForm />
+          <InstructorForm schoolBasePriceCents={school?.single_lesson_price_cents ?? 0} />
         </CardContent>
       </Card>
     </div>

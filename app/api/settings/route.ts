@@ -14,6 +14,9 @@ const patchSchema = z.object({
   stripe_secret_key: z.string().nullable().optional(),
   stripe_webhook_secret: z.string().nullable().optional(),
   single_lesson_price_cents: z.number().int().min(0).optional(),
+  student_cancellation_fee_cents: z.number().int().min(0).optional(),
+  instructor_cancellation_fee_cents: z.number().int().min(0).optional(),
+  max_booking_days_ahead: z.number().int().min(1).max(365).optional(),
 })
 
 export async function PATCH(request: NextRequest) {
@@ -51,6 +54,9 @@ export async function PATCH(request: NextRequest) {
   if (d.stripe_secret_key !== undefined) update.stripe_secret_key = d.stripe_secret_key
   if (d.stripe_webhook_secret !== undefined) update.stripe_webhook_secret = d.stripe_webhook_secret
   if (d.single_lesson_price_cents !== undefined) update.single_lesson_price_cents = d.single_lesson_price_cents
+  if (d.student_cancellation_fee_cents !== undefined) update.student_cancellation_fee_cents = d.student_cancellation_fee_cents
+  if (d.instructor_cancellation_fee_cents !== undefined) update.instructor_cancellation_fee_cents = d.instructor_cancellation_fee_cents
+  if (d.max_booking_days_ahead !== undefined) update.max_booking_days_ahead = d.max_booking_days_ahead
 
   const adminClient = createAdminClient()
   const { error } = await adminClient

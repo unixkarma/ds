@@ -13,6 +13,12 @@ const createInstructorSchema = z.object({
   phone: z.string().optional().default(''),
   licenseNumber: z.string().optional().default(''),
   maxLessonsPerDay: z.number().int().min(1).max(20).optional().default(6),
+  modality: z.enum(['school', 'independent']).optional().default('school'),
+  commissionRate: z.number().min(0).max(1).optional().default(0.10),
+  hourlyRateCents: z.number().int().min(0).optional().default(0),
+  lessonPriceCents: z.number().int().min(0).nullable().optional().default(null),
+  usesSchoolVehicle: z.boolean().optional().default(false),
+  vehicleMonthlyFeeCents: z.number().int().min(0).optional().default(0),
 })
 
 export async function POST(request: NextRequest) {
@@ -41,7 +47,11 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { firstName, lastName, email, phone, licenseNumber, maxLessonsPerDay } = parsed.data
+  const {
+    firstName, lastName, email, phone, licenseNumber, maxLessonsPerDay,
+    modality, commissionRate, hourlyRateCents, lessonPriceCents,
+    usesSchoolVehicle, vehicleMonthlyFeeCents,
+  } = parsed.data
   const schoolId = profile.school_id
   const adminClient = createAdminClient()
 
@@ -80,6 +90,12 @@ export async function POST(request: NextRequest) {
       school_id: schoolId,
       license_number: licenseNumber,
       max_lessons_per_day: maxLessonsPerDay,
+      modality,
+      commission_rate: commissionRate,
+      hourly_rate_cents: hourlyRateCents,
+      lesson_price_cents: lessonPriceCents,
+      uses_school_vehicle: usesSchoolVehicle,
+      vehicle_monthly_fee_cents: vehicleMonthlyFeeCents,
     })
     .select('*, user:users(*)')
     .single()

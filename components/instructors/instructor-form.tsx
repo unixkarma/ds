@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -18,10 +19,19 @@ import {
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import type { InstructorWithUser } from '@/types'
 
 // All fields typed as string to avoid z.coerce type conflicts with react-hook-form.
-// maxLessonsPerDay is converted to number in onSubmit.
+// Numbers are converted in onSubmit.
 const instructorFormSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
@@ -29,15 +39,22 @@ const instructorFormSchema = z.object({
   phone: z.string(),
   licenseNumber: z.string(),
   maxLessonsPerDay: z.string(),
+  modality: z.string(),
+  commissionRate: z.string(),
+  hourlyRateCents: z.string(),
+  lessonPriceCents: z.string(),
+  usesSchoolVehicle: z.boolean(),
+  vehicleMonthlyFeeCents: z.string(),
 })
 
 type InstructorFormValues = z.infer<typeof instructorFormSchema>
 
 interface InstructorFormProps {
   instructor?: InstructorWithUser
+  schoolBasePriceCents?: number
 }
 
-export function InstructorForm({ instructor }: InstructorFormProps) {
+export function InstructorForm({ instructor, schoolBasePriceCents = 0 }: InstructorFormProps) {
   const router = useRouter()
   const isEdit = !!instructor
   const [error, setError] = useState<string | null>(null)
@@ -52,8 +69,22 @@ export function InstructorForm({ instructor }: InstructorFormProps) {
       phone: instructor?.user.phone ?? '',
       licenseNumber: instructor?.license_number ?? '',
       maxLessonsPerDay: String(instructor?.max_lessons_per_day ?? 6),
+      modality: instructor?.modality ?? 'school',
+      commissionRate: String((instructor?.commission_rate ?? 0.10) * 100),
+      hourlyRateCents: String((instructor?.hourly_rate_cents ?? 0) / 100),
+      lessonPriceCents: instructor?.lesson_price_cents
+        ? String(instructor.lesson_price_cents / 100)
+        : '',
+      usesSchoolVehicle: instructor?.uses_school_vehicle ?? false,
+      vehicleMonthlyFeeCents: String((instructor?.vehicle_monthly_fee_cents ?? 27200) / 100),
     },
   })
+
+  const modality = form.watch('modality')
+  const usesVehicle = form.watch('usesSchoolVehicle')
+  const floorPrice = schoolBasePriceCents > 0
+    ? (schoolBasePriceCents * 0.8 / 100).toFixed(2)
+    : null
 
   async function onSubmit(values: InstructorFormValues) {
     if (!isEdit) {
@@ -68,8 +99,33 @@ export function InstructorForm({ instructor }: InstructorFormProps) {
       }
     }
 
+    // Validate lesson price floor for independent instructors
+    if (values.modality === 'independent' && values.lessonPriceCents && schoolBasePriceCents > 0) {
+      const priceCents = Math.round(parseFloat(values.lessonPriceCents) * 100)
+      const floor = Math.round(schoolBasePriceCents * 0.8)
+      if (priceCents < floor) {
+        form.setError('lessonPriceCents', {
+          message: `Minimum price is $${(floor / 100).toFixed(2)} (80% of base price)`,
+        })
+        return
+      }
+    }
+
     setIsLoading(true)
     setError(null)
+
+    const contractorFields = {
+      modality: values.modality,
+      commissionRate: parseFloat(values.commissionRate) / 100 || 0.10,
+      hourlyRateCents: Math.round(parseFloat(values.hourlyRateCents) * 100) || 0,
+      lessonPriceCents: values.lessonPriceCents
+        ? Math.round(parseFloat(values.lessonPriceCents) * 100)
+        : null,
+      usesSchoolVehicle: values.usesSchoolVehicle,
+      vehicleMonthlyFeeCents: values.usesSchoolVehicle
+        ? Math.round(parseFloat(values.vehicleMonthlyFeeCents) * 100) || 27200
+        : 0,
+    }
 
     try {
       let response: Response
@@ -84,6 +140,7 @@ export function InstructorForm({ instructor }: InstructorFormProps) {
             phone: values.phone,
             licenseNumber: values.licenseNumber,
             maxLessonsPerDay: parseInt(values.maxLessonsPerDay, 10) || 6,
+            ...contractorFields,
           }),
         })
       } else {
@@ -91,8 +148,13 @@ export function InstructorForm({ instructor }: InstructorFormProps) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            ...values,
+            firstName: values.firstName,
+            lastName: values.lastName,
+            email: values.email,
+            phone: values.phone,
+            licenseNumber: values.licenseNumber,
             maxLessonsPerDay: parseInt(values.maxLessonsPerDay, 10) || 6,
+            ...contractorFields,
           }),
         })
       }
@@ -210,6 +272,131 @@ export function InstructorForm({ instructor }: InstructorFormProps) {
               </FormItem>
             )}
           />
+        </div>
+
+        {/* ── Contractor Settings ───────────────────────────────── */}
+        <div className="border-t pt-5 mt-5">
+          <h3 className="text-sm font-semibold mb-4">Contractor Settings</h3>
+
+          <div className="space-y-5">
+            <FormField
+              control={form.control}
+              name="modality"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Modality</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="school">School Sale — school brings the student</SelectItem>
+                      <SelectItem value="independent">Independent — instructor brings their own students</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {modality === 'school' ? (
+              <FormField
+                control={form.control}
+                name="hourlyRateCents"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Hourly Rate ($)</FormLabel>
+                    <FormControl>
+                      <Input type="number" step="0.01" min={0} placeholder="30.00" {...field} />
+                    </FormControl>
+                    <FormDescription>
+                      What the instructor earns per hour when the school sells the lesson.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            ) : (
+              <>
+                <FormField
+                  control={form.control}
+                  name="lessonPriceCents"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Lesson Price ($)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" min={0} placeholder="65.00" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Price per hour the instructor charges.
+                        {floorPrice && ` Minimum: $${floorPrice} (80% of base price).`}
+                        {' '}Leave empty to use the school default.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="commissionRate"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Commission (%)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.1" min={0} max={100} placeholder="10" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Percentage the school keeps from independent sales.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </>
+            )}
+
+            <div className="space-y-4">
+              <FormField
+                control={form.control}
+                name="usesSchoolVehicle"
+                render={({ field }) => (
+                  <FormItem className="flex items-center gap-3">
+                    <FormControl>
+                      <Switch checked={field.value} onCheckedChange={field.onChange} />
+                    </FormControl>
+                    <div className="space-y-0.5">
+                      <FormLabel className="cursor-pointer">Uses School Vehicle</FormLabel>
+                      <FormDescription>
+                        Monthly fee will be deducted from earnings.
+                      </FormDescription>
+                    </div>
+                  </FormItem>
+                )}
+              />
+
+              {usesVehicle && (
+                <FormField
+                  control={form.control}
+                  name="vehicleMonthlyFeeCents"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Vehicle Monthly Fee ($)</FormLabel>
+                      <FormControl>
+                        <Input type="number" step="0.01" min={0} placeholder="272.00" {...field} />
+                      </FormControl>
+                      <FormDescription>
+                        Monthly deduction for commercial vehicle insurance.
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+            </div>
+          </div>
         </div>
 
         <div className="flex gap-3 pt-2">
