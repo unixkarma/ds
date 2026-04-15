@@ -1,14 +1,25 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { ChevronLeft, ChevronRight, CalendarPlus } from 'lucide-react'
+import { useState, useCallback, useMemo } from 'react'
+import { ChevronLeft, ChevronRight, CalendarPlus, Users, User } from 'lucide-react'
 import { format } from 'date-fns'
 
+import { getFullName } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { WeekView } from '@/components/schedule/week-view'
+import { MultiInstructorView } from '@/components/schedule/multi-instructor-view'
 import { BookLessonDialog } from '@/components/schedule/book-lesson-dialog'
 import { LessonDetailDialog } from '@/components/schedule/lesson-detail-dialog'
 import type { LessonWithRelations, StudentWithUser, InstructorWithUser, Vehicle } from '@/types'
+
+type ViewMode = 'single' | 'multi'
 
 function getWeekStart(date: Date): Date {
   const d = new Date(date)
@@ -21,7 +32,7 @@ function getWeekStart(date: Date): Date {
 
 interface ScheduleClientProps {
   initialLessons: LessonWithRelations[]
-  initialWeekStart: string // ISO string of the week's Monday
+  initialWeekStart: string
   students: StudentWithUser[]
   instructors: InstructorWithUser[]
   vehicles: Vehicle[]
@@ -34,15 +45,19 @@ export function ScheduleClient({
   instructors,
   vehicles,
 }: ScheduleClientProps) {
+  const [viewMode, setViewMode] = useState<ViewMode>('multi')
   const [weekStart, setWeekStart] = useState<Date>(new Date(initialWeekStart))
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [lessons, setLessons] = useState<LessonWithRelations[]>(initialLessons)
   const [isLoadingWeek, setIsLoadingWeek] = useState(false)
   const [bookingOpen, setBookingOpen] = useState(false)
   const [selectedLesson, setSelectedLesson] = useState<LessonWithRelations | null>(null)
+  const [selectedInstructorId, setSelectedInstructorId] = useState<string>('all')
 
   const weekEnd = new Date(weekStart)
   weekEnd.setDate(weekEnd.getDate() + 7)
 
+  // ── Labels ──────────────────────────────────────────────────
   const weekLabel = (() => {
     const startMonth = format(weekStart, 'MMM d')
     const endDate = new Date(weekEnd)
@@ -51,14 +66,20 @@ export function ScheduleClient({
     return `${startMonth} – ${endMonth}`
   })()
 
-  async function loadWeek(newWeekStart: Date) {
+  const dayLabel = format(selectedDate, 'EEEE, MMM d, yyyy')
+
+  // ── Filtered lessons ────────────────────────────────────────
+  const filteredLessons = useMemo(() => {
+    if (viewMode === 'multi' || selectedInstructorId === 'all') return lessons
+    return lessons.filter((l) => l.instructor_id === selectedInstructorId)
+  }, [lessons, selectedInstructorId, viewMode])
+
+  // ── Data loading ────────────────────────────────────────────
+  async function loadLessons(start: Date, end: Date) {
     setIsLoadingWeek(true)
     try {
-      const end = new Date(newWeekStart)
-      end.setDate(end.getDate() + 7)
-
       const res = await fetch(
-        `/api/lessons?start=${newWeekStart.toISOString()}&end=${end.toISOString()}`
+        `/api/lessons?start=${start.toISOString()}&end=${end.toISOString()}`
       )
       if (res.ok) {
         const data = await res.json()
@@ -69,6 +90,21 @@ export function ScheduleClient({
     }
   }
 
+  async function loadWeek(newWeekStart: Date) {
+    const end = new Date(newWeekStart)
+    end.setDate(end.getDate() + 7)
+    await loadLessons(newWeekStart, end)
+  }
+
+  async function loadDay(date: Date) {
+    const start = new Date(date)
+    start.setHours(0, 0, 0, 0)
+    const end = new Date(start)
+    end.setDate(end.getDate() + 1)
+    await loadLessons(start, end)
+  }
+
+  // ── Navigation — Single Instructor (week) ──────────────────
   function goToPrevWeek() {
     const prev = new Date(weekStart)
     prev.setDate(prev.getDate() - 7)
@@ -89,19 +125,58 @@ export function ScheduleClient({
     loadWeek(current)
   }
 
+  // ── Navigation — Multi Instructor (day) ────────────────────
+  function goToPrevDay() {
+    const prev = new Date(selectedDate)
+    prev.setDate(prev.getDate() - 1)
+    setSelectedDate(prev)
+    loadDay(prev)
+  }
+
+  function goToNextDay() {
+    const next = new Date(selectedDate)
+    next.setDate(next.getDate() + 1)
+    setSelectedDate(next)
+    loadDay(next)
+  }
+
+  function goToToday() {
+    const today = new Date()
+    setSelectedDate(today)
+    loadDay(today)
+  }
+
+  // ── View switch ─────────────────────────────────────────────
+  function switchView(mode: ViewMode) {
+    setViewMode(mode)
+    if (mode === 'multi') {
+      // Load the currently selected day
+      loadDay(selectedDate)
+    } else {
+      // Load the current week
+      const ws = getWeekStart(selectedDate)
+      setWeekStart(ws)
+      loadWeek(ws)
+    }
+  }
+
+  // ── Callbacks ───────────────────────────────────────────────
   const handleLessonClick = useCallback((lesson: LessonWithRelations) => {
     setSelectedLesson(lesson)
   }, [])
 
-  // After any mutation (book/cancel/reschedule), reload the current week
   function handleBookingOpenChange(open: boolean) {
     setBookingOpen(open)
-    if (!open) loadWeek(weekStart)
+    if (!open) {
+      if (viewMode === 'multi') loadDay(selectedDate)
+      else loadWeek(weekStart)
+    }
   }
 
   function handleLessonClose() {
     setSelectedLesson(null)
-    loadWeek(weekStart)
+    if (viewMode === 'multi') loadDay(selectedDate)
+    else loadWeek(weekStart)
   }
 
   const todayDateStr = format(new Date(), 'yyyy-MM-dd')
@@ -111,31 +186,101 @@ export function ScheduleClient({
       {/* Toolbar */}
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" onClick={goToPrevWeek} disabled={isLoadingWeek}>
+          {/* Nav arrows */}
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={viewMode === 'multi' ? goToPrevDay : goToPrevWeek}
+            disabled={isLoadingWeek}
+          >
             <ChevronLeft className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="icon" onClick={goToNextWeek} disabled={isLoadingWeek}>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={viewMode === 'multi' ? goToNextDay : goToNextWeek}
+            disabled={isLoadingWeek}
+          >
             <ChevronRight className="h-4 w-4" />
           </Button>
-          <Button variant="outline" size="sm" onClick={goToCurrentWeek} disabled={isLoadingWeek}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={viewMode === 'multi' ? goToToday : goToCurrentWeek}
+            disabled={isLoadingWeek}
+          >
             Today
           </Button>
-          <h2 className="text-base font-semibold ml-1 tabular-nums">{weekLabel}</h2>
+          <h2 className="text-base font-semibold ml-1 tabular-nums">
+            {viewMode === 'multi' ? dayLabel : weekLabel}
+          </h2>
         </div>
 
-        <Button onClick={() => setBookingOpen(true)}>
-          <CalendarPlus className="mr-2 h-4 w-4" />
-          Book Lesson
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Instructor filter — single view only */}
+          {viewMode === 'single' && (
+            <Select value={selectedInstructorId} onValueChange={setSelectedInstructorId}>
+              <SelectTrigger className="w-[180px] h-9 text-sm">
+                <SelectValue placeholder="All Instructors" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Instructors</SelectItem>
+                {instructors
+                  .filter((i) => i.is_active)
+                  .map((i) => (
+                    <SelectItem key={i.id} value={i.id}>
+                      {getFullName(i.user)}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* View toggle */}
+          <div className="flex rounded-md border overflow-hidden">
+            <Button
+              variant={viewMode === 'single' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none gap-1.5"
+              onClick={() => switchView('single')}
+            >
+              <User className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Single</span>
+            </Button>
+            <Button
+              variant={viewMode === 'multi' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none gap-1.5"
+              onClick={() => switchView('multi')}
+            >
+              <Users className="h-3.5 w-3.5" />
+              <span className="hidden sm:inline">Multi</span>
+            </Button>
+          </div>
+
+          <Button onClick={() => setBookingOpen(true)}>
+            <CalendarPlus className="mr-2 h-4 w-4" />
+            Book Lesson
+          </Button>
+        </div>
       </div>
 
       {/* Calendar */}
       <div className={isLoadingWeek ? 'opacity-60 pointer-events-none transition-opacity' : ''}>
-        <WeekView
-          lessons={lessons}
-          weekStart={weekStart}
-          onLessonClick={handleLessonClick}
-        />
+        {viewMode === 'single' ? (
+          <WeekView
+            lessons={filteredLessons}
+            weekStart={weekStart}
+            onLessonClick={handleLessonClick}
+          />
+        ) : (
+          <MultiInstructorView
+            lessons={lessons}
+            instructors={instructors}
+            selectedDate={selectedDate}
+            onLessonClick={handleLessonClick}
+          />
+        )}
       </div>
 
       {/* Dialogs */}
