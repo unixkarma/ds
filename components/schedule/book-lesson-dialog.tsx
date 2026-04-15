@@ -42,6 +42,8 @@ const bookLessonSchema = z.object({
   time: z.string().min(1, 'Time is required'),
   durationMinutes: z.string(),
   vehicleId: z.string(),
+  pickupLocation: z.string(),
+  dropoffLocation: z.string(),
   notes: z.string(),
 })
 
@@ -77,6 +79,8 @@ export function BookLessonDialog({
       time: '09:00',
       durationMinutes: '60',
       vehicleId: '',
+      pickupLocation: '',
+      dropoffLocation: '',
       notes: '',
     },
   })
@@ -97,6 +101,8 @@ export function BookLessonDialog({
           scheduledAt,
           durationMinutes: parseInt(values.durationMinutes, 10),
           vehicleId: values.vehicleId && values.vehicleId !== 'none' ? values.vehicleId : null,
+          pickupLocation: values.pickupLocation || '',
+          dropoffLocation: values.dropoffLocation || '',
           notes: values.notes || null,
         }),
       })
@@ -266,6 +272,36 @@ export function BookLessonDialog({
                         ))}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Pickup / Dropoff */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="pickupLocation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Pickup Location</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. 123 Main St" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="dropoffLocation"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Dropoff Location</FormLabel>
+                    <FormControl>
+                      <Input placeholder="e.g. 456 Oak Ave" {...field} />
+                    </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}

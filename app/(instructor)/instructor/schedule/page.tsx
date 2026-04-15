@@ -104,6 +104,7 @@ function LessonTable({ lessons }: { lessons: LessonWithRelations[] }) {
             <th className="text-left pb-2 font-medium">Duration</th>
             <th className="text-left pb-2 font-medium">Vehicle</th>
             <th className="text-left pb-2 font-medium">Status</th>
+            <th className="text-left pb-2 font-medium hidden lg:table-cell">Notes</th>
             <th className="text-left pb-2 font-medium">Actions</th>
           </tr>
         </thead>
@@ -130,8 +131,17 @@ function LessonTable({ lessons }: { lessons: LessonWithRelations[] }) {
                     {lesson.status.replace('_', ' ')}
                   </Badge>
                 </td>
+                <td className="py-2.5 hidden lg:table-cell">
+                  {lesson.notes ? (
+                    <p className="text-xs text-muted-foreground max-w-[200px] truncate" title={lesson.notes}>
+                      {lesson.notes}
+                    </p>
+                  ) : (
+                    <span className="text-xs text-muted-foreground">—</span>
+                  )}
+                </td>
                 <td className="py-2.5">
-                  <LessonActions lessonId={lesson.id} status={lesson.status} />
+                  <LessonActions lessonId={lesson.id} status={lesson.status} existingNotes={lesson.notes} />
                 </td>
               </tr>
             )

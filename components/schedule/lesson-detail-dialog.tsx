@@ -176,6 +176,18 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
             </Row>
           )}
 
+          {lesson.pickup_location && (
+            <Row label="Pickup">
+              {lesson.pickup_location}
+            </Row>
+          )}
+
+          {lesson.dropoff_location && (
+            <Row label="Dropoff">
+              {lesson.dropoff_location}
+            </Row>
+          )}
+
           {lesson.notes && (
             <div className="pt-1">
               <p className="text-muted-foreground mb-1">Notes</p>

@@ -145,9 +145,9 @@ export function WeekView({ lessons, weekStart, onLessonClick }: WeekViewProps) {
                         {lesson.instructor.user.first_name} {lesson.instructor.user.last_name}
                       </div>
                     )}
-                    {height >= 56 && (
+                    {height >= 56 && lesson.pickup_location && (
                       <div className="truncate text-[10px] opacity-60 leading-tight">
-                        {lesson.duration_minutes} min
+                        ↑ {lesson.pickup_location}
                       </div>
                     )}
                   </button>

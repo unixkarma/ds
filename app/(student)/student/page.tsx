@@ -5,6 +5,7 @@ import { CalendarDays, CheckCircle, Clock, BookOpen } from 'lucide-react'
 import { getStudentPortalData } from '@/lib/services/student-portal'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { PermitUpload } from '@/components/student/permit-upload'
 import type { LessonWithRelations, LessonStatus } from '@/types'
 
 const STATUS_BADGE: Record<LessonStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -20,8 +21,7 @@ export default async function StudentPortalPage() {
   if (!data) redirect('/login')
 
   const { student, upcomingLessons, recentLessons } = data
-  const lessonsRemaining =
-    student.total_lessons_purchased - student.total_lessons_completed
+  const lessonsRemaining = student.lessons_remaining ?? 0
 
   return (
     <div className="space-y-8">
@@ -56,6 +56,12 @@ export default async function StudentPortalPage() {
           iconClass="text-amber-500"
         />
       </div>
+
+      {/* Permit photo upload */}
+      <PermitUpload
+        studentId={student.id}
+        existingUrl={student.permit_photo_url || ''}
+      />
 
       {/* Upcoming lessons */}
       <Card>
@@ -99,6 +105,7 @@ export default async function StudentPortalPage() {
                     <th className="text-left pb-2 font-medium">Instructor</th>
                     <th className="text-left pb-2 font-medium">Duration</th>
                     <th className="text-left pb-2 font-medium">Status</th>
+                    <th className="text-left pb-2 font-medium hidden md:table-cell">Notes</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -119,6 +126,15 @@ export default async function StudentPortalPage() {
                           <Badge variant={STATUS_BADGE[lesson.status]}>
                             {lesson.status.replace('_', ' ')}
                           </Badge>
+                        </td>
+                        <td className="py-2.5 hidden md:table-cell">
+                          {lesson.notes ? (
+                            <p className="text-xs text-muted-foreground max-w-[250px] truncate" title={lesson.notes}>
+                              {lesson.notes}
+                            </p>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
                         </td>
                       </tr>
                     )
