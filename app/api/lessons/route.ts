@@ -45,6 +45,8 @@ const createLessonSchema = z.object({
   durationMinutes: z.number().int().min(15).max(240).default(60),
   vehicleId: z.string().uuid().nullable().optional(),
   notes: z.string().optional(),
+  pickupLocation: z.string().optional(),
+  dropoffLocation: z.string().optional(),
   soldBy: z.enum(['school', 'instructor']).optional(),
 })
 
@@ -72,7 +74,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { studentId, instructorId, scheduledAt, durationMinutes, vehicleId, notes, soldBy } = parsed.data
+  const { studentId, instructorId, scheduledAt, durationMinutes, vehicleId, notes, pickupLocation, dropoffLocation, soldBy } = parsed.data
   const schoolId = profile.school_id
 
   // Determine sold_by: instructors creating lessons = 'instructor', otherwise 'school'
@@ -191,6 +193,8 @@ export async function POST(request: NextRequest) {
       scheduled_at: scheduledAt,
       duration_minutes: durationMinutes,
       notes: notes ?? null,
+      pickup_location: pickupLocation ?? '',
+      dropoff_location: dropoffLocation ?? '',
       sold_by: resolvedSoldBy,
       price_cents: priceCents,
     })
@@ -203,6 +207,20 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Decrement lessons_remaining for the student
+  const { data: studentRecord2 } = await adminClient
+    .from('students')
+    .select('lessons_remaining')
+    .eq('id', studentId)
+    .single()
+
+  if (studentRecord2 && studentRecord2.lessons_remaining > 0) {
+    await adminClient
+      .from('students')
+      .update({ lessons_remaining: studentRecord2.lessons_remaining - 1 })
+      .eq('id', studentId)
+  }
 
   return NextResponse.json({ lesson }, { status: 201 })
 }

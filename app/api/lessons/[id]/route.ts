@@ -11,6 +11,8 @@ const updateLessonSchema = z.object({
   durationMinutes: z.number().int().min(15).max(240).optional(),
   vehicleId: z.string().uuid().nullable().optional(),
   notes: z.string().nullable().optional(),
+  pickupLocation: z.string().optional(),
+  dropoffLocation: z.string().optional(),
 })
 
 export async function PATCH(
@@ -104,6 +106,8 @@ export async function PATCH(
   if (updates.durationMinutes !== undefined) lessonUpdates.duration_minutes = updates.durationMinutes
   if (updates.vehicleId !== undefined) lessonUpdates.vehicle_id = updates.vehicleId
   if (updates.notes !== undefined) lessonUpdates.notes = updates.notes
+  if (updates.pickupLocation !== undefined) lessonUpdates.pickup_location = updates.pickupLocation
+  if (updates.dropoffLocation !== undefined) lessonUpdates.dropoff_location = updates.dropoffLocation
 
   // ── Calculate instructor earnings when marking complete ─────
   if (updates.status === 'completed' && existing.status !== 'completed') {
@@ -177,6 +181,22 @@ export async function PATCH(
       await adminClient
         .from('students')
         .update({ total_lessons_completed: student.total_lessons_completed + 1 })
+        .eq('id', existing.student_id)
+    }
+  }
+
+  // When cancelling a scheduled lesson, refund the lesson credit back to the student
+  if (updates.status === 'cancelled' && existing.status === 'scheduled') {
+    const { data: student } = await adminClient
+      .from('students')
+      .select('lessons_remaining')
+      .eq('id', existing.student_id)
+      .single()
+
+    if (student) {
+      await adminClient
+        .from('students')
+        .update({ lessons_remaining: student.lessons_remaining + 1 })
         .eq('id', existing.student_id)
     }
   }

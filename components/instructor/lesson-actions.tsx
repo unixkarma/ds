@@ -5,6 +5,15 @@ import { useRouter } from 'next/navigation'
 import { CheckCircle, XCircle, Ban, Loader2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from '@/components/ui/dialog'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,24 +29,32 @@ import {
 interface LessonActionsProps {
   lessonId: string
   status: string
+  existingNotes?: string | null
 }
 
-export function LessonActions({ lessonId, status }: LessonActionsProps) {
+export function LessonActions({ lessonId, status, existingNotes }: LessonActionsProps) {
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [completeDialogOpen, setCompleteDialogOpen] = useState(false)
+  const [notes, setNotes] = useState(existingNotes ?? '')
 
   if (status !== 'scheduled') return null
 
-  async function handleAction(newStatus: 'completed' | 'no_show' | 'cancelled') {
+  async function handleAction(newStatus: 'completed' | 'no_show' | 'cancelled', lessonNotes?: string) {
     setLoading(newStatus)
     setError(null)
 
     try {
+      const body: Record<string, unknown> = { status: newStatus }
+      if (lessonNotes !== undefined) {
+        body.notes = lessonNotes || null
+      }
+
       const res = await fetch(`/api/lessons/${lessonId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(body),
       })
 
       if (!res.ok) {
@@ -46,6 +63,7 @@ export function LessonActions({ lessonId, status }: LessonActionsProps) {
         return
       }
 
+      setCompleteDialogOpen(false)
       router.refresh()
     } catch {
       setError('Network error. Please try again.')
@@ -60,21 +78,60 @@ export function LessonActions({ lessonId, status }: LessonActionsProps) {
         <span className="text-xs text-destructive mr-2">{error}</span>
       )}
 
+      {/* Complete — opens notes dialog */}
       <Button
         size="sm"
         variant="ghost"
         className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
-        onClick={() => handleAction('completed')}
+        onClick={() => setCompleteDialogOpen(true)}
         disabled={!!loading}
         title="Mark Complete"
       >
-        {loading === 'completed' ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
-        ) : (
-          <CheckCircle className="h-4 w-4" />
-        )}
+        <CheckCircle className="h-4 w-4" />
       </Button>
 
+      {/* Complete dialog with notes */}
+      <Dialog open={completeDialogOpen} onOpenChange={setCompleteDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Complete Lesson</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="lesson-notes">Lesson Notes</Label>
+              <Textarea
+                id="lesson-notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="What did you cover? Any areas to focus on next time? (e.g. parallel parking needs more practice, highway driving went well...)"
+                rows={4}
+              />
+              <p className="text-xs text-muted-foreground">
+                These notes help the next instructor see the student&apos;s progress.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setCompleteDialogOpen(false)}
+              disabled={!!loading}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => handleAction('completed', notes)}
+              disabled={!!loading}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white"
+            >
+              {loading === 'completed' && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              Mark Complete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* No Show */}
       <Button
         size="sm"
         variant="ghost"
@@ -90,6 +147,7 @@ export function LessonActions({ lessonId, status }: LessonActionsProps) {
         )}
       </Button>
 
+      {/* Cancel */}
       <AlertDialog>
         <AlertDialogTrigger asChild>
           <Button

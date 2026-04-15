@@ -75,6 +75,7 @@ export interface Student {
   permit_number: string
   permit_issued_date: string | null
   permit_expiration_date: string | null
+  permit_photo_url: string
   school_referral: boolean
   created_at?: string
 }
@@ -137,6 +138,8 @@ export interface Lesson {
   duration_minutes: number
   status: LessonStatus
   notes: string | null
+  pickup_location: string
+  dropoff_location: string
   sold_by: LessonSoldBy
   price_cents: number
   instructor_earning_cents: number

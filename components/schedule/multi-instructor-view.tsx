@@ -126,6 +126,11 @@ export function MultiInstructorView({
                       {lesson.duration_minutes} min · {lesson.status}
                     </div>
                   )}
+                  {height >= 56 && lesson.pickup_location && (
+                    <div className="truncate text-[10px] opacity-60 leading-tight">
+                      ↑ {lesson.pickup_location}
+                    </div>
+                  )}
                 </button>
               )
             })}

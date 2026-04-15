@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { ChevronLeft, Mail, Phone, Calendar, FileText, Pencil } from 'lucide-react'
+import { ChevronLeft, Mail, Phone, Calendar, FileText, Pencil, ImageIcon } from 'lucide-react'
 
 import { getStudentById } from '@/lib/services/students'
 import { formatDate, formatDateTime, getFullName } from '@/lib/utils'
@@ -144,6 +144,27 @@ export default async function StudentDetailPage({
           </CardContent>
         </Card>
       </div>
+
+      {/* Permit photo */}
+      {student.permit_photo_url && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <ImageIcon className="h-4 w-4" />
+              Learner&apos;s Permit
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="rounded-lg overflow-hidden border bg-muted inline-block">
+              <img
+                src={student.permit_photo_url}
+                alt="Learner's permit"
+                className="max-h-[400px] object-contain"
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Lesson history */}
       <Card>
