@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { ChevronLeft, Mail, Phone, Hash, BookOpen, Pencil } from 'lucide-react'
+import { ChevronLeft, Mail, Phone, Hash, BookOpen, Pencil, Send } from 'lucide-react'
 
 import { getInstructorById } from '@/lib/services/instructors'
 import { formatDateTime, formatTime, getFullName, DAY_LABELS } from '@/lib/utils'
@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { AvailabilityForm } from '@/components/instructors/availability-form'
 import { InstructorStatusToggle } from '@/components/instructors/instructor-status-toggle'
+import { ResendInviteButton } from '@/components/instructors/resend-invite-button'
 import type { LessonStatus } from '@/types'
 
 export const metadata: Metadata = { title: 'Instructor Details' }
@@ -59,6 +60,7 @@ export default async function InstructorDetailPage({
           <Badge variant={instructor.is_active ? 'default' : 'secondary'}>
             {instructor.is_active ? 'Active' : 'Inactive'}
           </Badge>
+          <ResendInviteButton instructorId={id} />
           <Link href={`/dashboard/instructors/${id}/edit`}>
             <Button variant="outline" size="sm">
               <Pencil className="mr-2 h-3.5 w-3.5" />
