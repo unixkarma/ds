@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Search, UserPlus, MoreHorizontal, Pencil, Power } from 'lucide-react'
+import { Search, UserPlus, MoreHorizontal, Pencil, Power, Send } from 'lucide-react'
 
 import { cn, getFullName } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -25,6 +25,7 @@ export function InstructorTable({ instructors }: InstructorTableProps) {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [resendingId, setResendingId] = useState<string | null>(null)
 
   const filtered = instructors.filter((inst) => {
     if (!search) return true
@@ -45,6 +46,20 @@ export function InstructorTable({ instructors }: InstructorTableProps) {
     })
     router.refresh()
     setTogglingId(null)
+  }
+
+  async function resendInvite(inst: InstructorWithUser) {
+    setResendingId(inst.id)
+    const res = await fetch(`/api/instructors/${inst.id}/resend-invite`, {
+      method: 'POST',
+    })
+    if (res.ok) {
+      alert('Invitation resent successfully')
+    } else {
+      const data = await res.json()
+      alert(`Failed to resend: ${data.error}`)
+    }
+    setResendingId(null)
   }
 
   return (
@@ -134,6 +149,13 @@ export function InstructorTable({ instructors }: InstructorTableProps) {
                             <Pencil className="mr-2 h-4 w-4" />
                             Edit
                           </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => resendInvite(inst)}
+                          disabled={resendingId === inst.id}
+                        >
+                          <Send className="mr-2 h-4 w-4" />
+                          {resendingId === inst.id ? 'Sending...' : 'Resend Invite'}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => toggleActive(inst)}
