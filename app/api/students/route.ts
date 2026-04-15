@@ -13,6 +13,7 @@ const createStudentSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   email: z.string().email(),
+  password: z.string().min(6),
   phone: z.string().optional().default(''),
   dateOfBirth: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
@@ -50,27 +51,25 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { firstName, lastName, email, phone, dateOfBirth, notes } = parsed.data
+  const { firstName, lastName, email, password, phone, dateOfBirth, notes } = parsed.data
   const schoolId = profile.school_id
 
   const adminClient = createAdminClient()
 
-  // 3. Invite the student via Supabase Auth.
-  //    They receive an email to set their own password.
-  //    The trigger will NOT create a school because we pass no school_name.
-  const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/auth/update-password`
-
-  const { data: inviteData, error: inviteError } =
-    await adminClient.auth.admin.inviteUserByEmail(email, {
-      redirectTo,
+  // 3. Create the auth user with the password set by the admin.
+  //    email_confirm: true so they can log in immediately.
+  const { data: createData, error: createError } =
+    await adminClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
     })
 
-  if (inviteError) {
-    // "User already registered" is a common error if the email exists
-    return NextResponse.json({ error: inviteError.message }, { status: 422 })
+  if (createError) {
+    return NextResponse.json({ error: createError.message }, { status: 422 })
   }
 
-  const authUserId = inviteData.user.id
+  const authUserId = createData.user.id
 
   // 4. Create the public users row manually (trigger skipped, no school_name)
   const { error: userInsertError } = await adminClient.from('users').insert({

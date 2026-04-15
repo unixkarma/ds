@@ -10,6 +10,7 @@ const createInstructorSchema = z.object({
   firstName: z.string().min(1),
   lastName: z.string().min(1),
   email: z.string().email(),
+  password: z.string().min(6),
   phone: z.string().optional().default(''),
   licenseNumber: z.string().optional().default(''),
   maxLessonsPerDay: z.number().int().min(1).max(20).optional().default(6),
@@ -48,23 +49,25 @@ export async function POST(request: NextRequest) {
   }
 
   const {
-    firstName, lastName, email, phone, licenseNumber, maxLessonsPerDay,
+    firstName, lastName, email, password, phone, licenseNumber, maxLessonsPerDay,
     modality, commissionRate, hourlyRateCents, lessonPriceCents,
     usesSchoolVehicle, vehicleMonthlyFeeCents,
   } = parsed.data
   const schoolId = profile.school_id
   const adminClient = createAdminClient()
 
-  const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/auth/update-password`
+  const { data: createData, error: createError } =
+    await adminClient.auth.admin.createUser({
+      email,
+      password,
+      email_confirm: true,
+    })
 
-  const { data: inviteData, error: inviteError } =
-    await adminClient.auth.admin.inviteUserByEmail(email, { redirectTo })
-
-  if (inviteError) {
-    return NextResponse.json({ error: inviteError.message }, { status: 422 })
+  if (createError) {
+    return NextResponse.json({ error: createError.message }, { status: 422 })
   }
 
-  const authUserId = inviteData.user.id
+  const authUserId = createData.user.id
 
   // Create the users row (trigger skipped — no school_name in invite metadata)
   const { error: userInsertError } = await adminClient.from('users').insert({

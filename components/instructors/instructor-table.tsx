@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Search, UserPlus, MoreHorizontal, Pencil, Power, Send } from 'lucide-react'
+import { Search, UserPlus, MoreHorizontal, Pencil, Power, KeyRound, Trash2 } from 'lucide-react'
 
 import { cn, getFullName } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -26,6 +26,7 @@ export function InstructorTable({ instructors }: InstructorTableProps) {
   const [search, setSearch] = useState('')
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [resendingId, setResendingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const filtered = instructors.filter((inst) => {
     if (!search) return true
@@ -48,18 +49,31 @@ export function InstructorTable({ instructors }: InstructorTableProps) {
     setTogglingId(null)
   }
 
-  async function resendInvite(inst: InstructorWithUser) {
+  async function resetPassword(inst: InstructorWithUser) {
     setResendingId(inst.id)
     const res = await fetch(`/api/instructors/${inst.id}/resend-invite`, {
       method: 'POST',
     })
     if (res.ok) {
-      alert('Invitation resent successfully')
+      alert('Password reset email sent successfully')
     } else {
       const data = await res.json()
-      alert(`Failed to resend: ${data.error}`)
+      alert(`Failed to send: ${data.error}`)
     }
     setResendingId(null)
+  }
+
+  async function deleteInstructor(inst: InstructorWithUser) {
+    if (!confirm(`Are you sure you want to delete ${getFullName(inst.user)}? This action cannot be undone.`)) return
+    setDeletingId(inst.id)
+    const res = await fetch(`/api/instructors/${inst.id}`, { method: 'DELETE' })
+    if (res.ok) {
+      router.refresh()
+    } else {
+      const data = await res.json()
+      alert(`Failed to delete: ${data.error}`)
+    }
+    setDeletingId(null)
   }
 
   return (
@@ -151,19 +165,26 @@ export function InstructorTable({ instructors }: InstructorTableProps) {
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem
-                          onClick={() => resendInvite(inst)}
+                          onClick={() => resetPassword(inst)}
                           disabled={resendingId === inst.id}
                         >
-                          <Send className="mr-2 h-4 w-4" />
-                          {resendingId === inst.id ? 'Sending...' : 'Resend Invite'}
+                          <KeyRound className="mr-2 h-4 w-4" />
+                          {resendingId === inst.id ? 'Sending...' : 'Reset Password'}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                           onClick={() => toggleActive(inst)}
                           disabled={togglingId === inst.id}
-                          className={cn(inst.is_active && 'text-destructive focus:text-destructive')}
                         >
                           <Power className="mr-2 h-4 w-4" />
                           {inst.is_active ? 'Deactivate' : 'Activate'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => deleteInstructor(inst)}
+                          disabled={deletingId === inst.id}
+                          className="text-destructive focus:text-destructive"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          {deletingId === inst.id ? 'Deleting...' : 'Delete'}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>

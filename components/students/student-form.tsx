@@ -28,6 +28,7 @@ const studentFormSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string(),
+  password: z.string(),
   phone: z.string(),
   dateOfBirth: z.string(),
   notes: z.string(),
@@ -53,6 +54,7 @@ export function StudentForm({ student }: StudentFormProps) {
       firstName: student?.user.first_name ?? '',
       lastName: student?.user.last_name ?? '',
       email: '',
+      password: '',
       phone: student?.user.phone ?? '',
       dateOfBirth: student?.user.date_of_birth ?? '',
       notes: student?.notes ?? '',
@@ -69,6 +71,10 @@ export function StudentForm({ student }: StudentFormProps) {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       if (!emailRegex.test(values.email)) {
         form.setError('email', { message: 'Please enter a valid email address' })
+        return
+      }
+      if (!values.password.trim() || values.password.length < 6) {
+        form.setError('password', { message: 'Password must be at least 6 characters' })
         return
       }
     }
@@ -155,27 +161,43 @@ export function StudentForm({ student }: StudentFormProps) {
 
         {/* Email — only shown in create mode */}
         {!isEdit && (
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <Input
-                    type="email"
-                    placeholder="jane@example.com"
-                    autoComplete="off"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-                <p className="text-xs text-muted-foreground">
-                  The student will receive an invite email to set their password.
-                </p>
-              </FormItem>
-            )}
-          />
+          <>
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="email"
+                      placeholder="jane@example.com"
+                      autoComplete="off"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="Min 6 characters" autoComplete="new-password" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                  <p className="text-xs text-muted-foreground">
+                    Share this password with the student so they can log in.
+                  </p>
+                </FormItem>
+              )}
+            />
+          </>
         )}
 
         {/* Phone + DOB row */}

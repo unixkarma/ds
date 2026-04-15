@@ -36,6 +36,7 @@ const instructorFormSchema = z.object({
   firstName: z.string().min(1, 'First name is required'),
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string(),
+  password: z.string(),
   phone: z.string(),
   licenseNumber: z.string(),
   maxLessonsPerDay: z.string(),
@@ -66,6 +67,7 @@ export function InstructorForm({ instructor, schoolBasePriceCents = 0 }: Instruc
       firstName: instructor?.user.first_name ?? '',
       lastName: instructor?.user.last_name ?? '',
       email: '',
+      password: '',
       phone: instructor?.user.phone ?? '',
       licenseNumber: instructor?.license_number ?? '',
       maxLessonsPerDay: String(instructor?.max_lessons_per_day ?? 6),
@@ -95,6 +97,10 @@ export function InstructorForm({ instructor, schoolBasePriceCents = 0 }: Instruc
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
       if (!emailRegex.test(values.email)) {
         form.setError('email', { message: 'Please enter a valid email address' })
+        return
+      }
+      if (!values.password.trim() || values.password.length < 6) {
+        form.setError('password', { message: 'Password must be at least 6 characters' })
         return
       }
     }
@@ -151,6 +157,7 @@ export function InstructorForm({ instructor, schoolBasePriceCents = 0 }: Instruc
             firstName: values.firstName,
             lastName: values.lastName,
             email: values.email,
+            password: values.password,
             phone: values.phone,
             licenseNumber: values.licenseNumber,
             maxLessonsPerDay: parseInt(values.maxLessonsPerDay, 10) || 6,
@@ -213,22 +220,38 @@ export function InstructorForm({ instructor, schoolBasePriceCents = 0 }: Instruc
         </div>
 
         {!isEdit && (
-          <FormField
-            control={form.control}
-            name="email"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Email</FormLabel>
-                <FormControl>
-                  <Input type="email" placeholder="instructor@example.com" autoComplete="off" {...field} />
-                </FormControl>
-                <FormMessage />
-                <p className="text-xs text-muted-foreground">
-                  The instructor will receive an invite email to set their password.
-                </p>
-              </FormItem>
-            )}
-          />
+          <>
+            <FormField
+              control={form.control}
+              name="email"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Email</FormLabel>
+                  <FormControl>
+                    <Input type="email" placeholder="instructor@example.com" autoComplete="off" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input type="password" placeholder="Min 6 characters" autoComplete="new-password" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                  <p className="text-xs text-muted-foreground">
+                    Share this password with the instructor so they can log in.
+                  </p>
+                </FormItem>
+              )}
+            />
+          </>
         )}
 
         <FormField
