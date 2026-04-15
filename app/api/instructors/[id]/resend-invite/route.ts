@@ -2,7 +2,6 @@
 
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
 
 export async function POST(
   _request: NextRequest,
@@ -38,11 +37,11 @@ export async function POST(
   }
 
   const email = (instructor.user as unknown as { email: string }).email
-  const adminClient = createAdminClient()
 
   const redirectTo = `${process.env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/auth/update-password`
 
-  const { error } = await adminClient.auth.admin.inviteUserByEmail(email, { redirectTo })
+  const supabaseForReset = await createClient()
+  const { error } = await supabaseForReset.auth.resetPasswordForEmail(email, { redirectTo })
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 422 })
