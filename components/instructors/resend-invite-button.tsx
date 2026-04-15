@@ -1,34 +1,34 @@
 'use client'
 
 import { useState } from 'react'
-import { Send } from 'lucide-react'
+import { KeyRound } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-interface ResendInviteButtonProps {
+interface ResetPasswordButtonProps {
   instructorId: string
 }
 
-export function ResendInviteButton({ instructorId }: ResendInviteButtonProps) {
+export function ResendInviteButton({ instructorId }: ResetPasswordButtonProps) {
   const [sending, setSending] = useState(false)
 
-  async function handleResend() {
+  async function handleReset() {
     setSending(true)
     const res = await fetch(`/api/instructors/${instructorId}/resend-invite`, {
       method: 'POST',
     })
     if (res.ok) {
-      alert('Invitation resent successfully')
+      alert('Password reset email sent successfully')
     } else {
       const data = await res.json()
-      alert(`Failed to resend: ${data.error}`)
+      alert(`Failed to send: ${data.error}`)
     }
     setSending(false)
   }
 
   return (
-    <Button variant="outline" size="sm" onClick={handleResend} disabled={sending}>
-      <Send className="mr-2 h-3.5 w-3.5" />
-      {sending ? 'Sending...' : 'Resend Invite'}
+    <Button variant="outline" size="sm" onClick={handleReset} disabled={sending}>
+      <KeyRound className="mr-2 h-3.5 w-3.5" />
+      {sending ? 'Sending...' : 'Reset Password'}
     </Button>
   )
 }
