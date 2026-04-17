@@ -1,7 +1,7 @@
 // GET /api/instructors/[id]/available-slots?date=YYYY-MM-DD
 // Returns open 1-hour time slots for the given instructor on the given date.
 // Logic: look up the instructor's weekly availability for that day_of_week,
-// then subtract any already-booked lessons to produce the open slots.
+// then subtract any already-booked lessons (plus buffer time) to produce the open slots.
 
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
@@ -32,7 +32,15 @@ export async function GET(
   const requestedDate = new Date(dateStr + 'T00:00:00')
   const dayOfWeek = requestedDate.getDay()
 
-  // Fetch instructor's availability for that day
+  // Fetch instructor's availability for that day + buffer_minutes
+  const { data: instructor } = await supabase
+    .from('instructors')
+    .select('buffer_minutes')
+    .eq('id', instructorId)
+    .single()
+
+  const bufferMinutes = instructor?.buffer_minutes ?? 0
+
   const { data: availability } = await supabase
     .from('availability')
     .select('start_time, end_time')
@@ -55,13 +63,14 @@ export async function GET(
     .gte('scheduled_at', dayStart)
     .lte('scheduled_at', dayEnd)
 
-  // Convert booked lessons to time ranges
+  // Convert booked lessons to time ranges (including buffer after each lesson)
   const bookedRanges = (bookedLessons ?? []).map(lesson => {
     const start = new Date(lesson.scheduled_at)
     const end = new Date(start.getTime() + lesson.duration_minutes * 60 * 1000)
     return {
       startMinutes: start.getHours() * 60 + start.getMinutes(),
-      endMinutes: end.getHours() * 60 + end.getMinutes(),
+      // End includes buffer — no new slot can start until buffer has passed
+      endMinutes: end.getHours() * 60 + end.getMinutes() + bufferMinutes,
     }
   })
 
@@ -78,7 +87,7 @@ export async function GET(
     for (let slotStart = availStart; slotStart + slotDuration <= availEnd; slotStart += slotDuration) {
       const slotEnd = slotStart + slotDuration
 
-      // Check if this slot overlaps with any booked lesson
+      // Check if this slot overlaps with any booked lesson (including buffer)
       const isBooked = bookedRanges.some(
         booked => booked.startMinutes < slotEnd && booked.endMinutes > slotStart
       )

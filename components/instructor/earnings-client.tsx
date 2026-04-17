@@ -8,6 +8,7 @@ import {
   DollarSign,
   TrendingDown,
   Wallet,
+  Timer,
 } from 'lucide-react'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -68,7 +69,7 @@ export function EarningsClient({
 
   return (
     <div className="space-y-8">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">My Earnings</h1>
           <p className="text-muted-foreground text-sm mt-1">
@@ -77,7 +78,7 @@ export function EarningsClient({
         </div>
 
         <Select value={currentPeriod} onValueChange={handlePeriodChange}>
-          <SelectTrigger className="w-[180px]">
+          <SelectTrigger className="w-full sm:w-[180px]">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -88,7 +89,7 @@ export function EarningsClient({
       </div>
 
       {/* Stats cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <StatCard
           icon={BookOpen}
           label="Lessons"
@@ -119,6 +120,12 @@ export function EarningsClient({
           value={dollars(netEarnings)}
           iconClass="text-primary"
         />
+        <StatCard
+          icon={Timer}
+          label="Avg $/hr"
+          value={totalHours > 0 ? dollars(Math.round(grossEarnings / totalHours)) : '—'}
+          iconClass="text-violet-500"
+        />
       </div>
 
       {/* Completed lessons table */}
@@ -134,53 +141,47 @@ export function EarningsClient({
               No completed lessons this period.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-muted-foreground text-xs uppercase">
-                    <th className="text-left pb-2 font-medium">Date</th>
-                    <th className="text-left pb-2 font-medium">Student</th>
-                    <th className="text-left pb-2 font-medium">Duration</th>
-                    <th className="text-left pb-2 font-medium">Price</th>
-                    <th className="text-left pb-2 font-medium">You Earned</th>
-                    <th className="text-left pb-2 font-medium">Source</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {lessons.map(lesson => (
-                    <tr key={lesson.id}>
-                      <td className="py-2.5 pr-4">
-                        <div className="font-medium">
-                          {format(new Date(lesson.scheduled_at), 'MMM d')}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                          {format(new Date(lesson.scheduled_at), 'h:mm a')}
-                        </div>
-                      </td>
-                      <td className="py-2.5 pr-4">
+            <div className="space-y-3">
+              {lessons.map(lesson => (
+                <div key={lesson.id} className="border rounded-lg p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-medium text-sm">
+                        {format(new Date(lesson.scheduled_at), 'MMM d')} · {format(new Date(lesson.scheduled_at), 'h:mm a')}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
                         {lesson.student_first_name} {lesson.student_last_name}
-                      </td>
-                      <td className="py-2.5 pr-4">
+                        <span className="mx-1.5">·</span>
                         {lesson.duration_minutes} min
-                      </td>
-                      <td className="py-2.5 pr-4">
-                        {dollars(lesson.price_cents)}
-                      </td>
-                      <td className="py-2.5 pr-4 font-medium text-emerald-600">
-                        {dollars(lesson.instructor_earning_cents)}
-                      </td>
-                      <td className="py-2.5">
-                        <Badge
-                          variant={lesson.sold_by === 'instructor' ? 'default' : 'secondary'}
-                          className="text-xs"
-                        >
-                          {lesson.sold_by === 'instructor' ? 'My sale' : 'School'}
-                        </Badge>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      </p>
+                    </div>
+                    <Badge
+                      variant={lesson.sold_by === 'instructor' ? 'default' : 'secondary'}
+                      className="text-xs shrink-0"
+                    >
+                      {lesson.sold_by === 'instructor' ? 'My sale' : 'School'}
+                    </Badge>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 pt-2 border-t text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Price:</span>{' '}
+                      <span>{dollars(lesson.price_cents)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Earned:</span>{' '}
+                      <span className="font-medium text-emerald-600">{dollars(lesson.instructor_earning_cents)}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">$/hr:</span>{' '}
+                      <span className="font-medium text-violet-600">
+                        {lesson.duration_minutes > 0
+                          ? dollars(Math.round(lesson.instructor_earning_cents / (lesson.duration_minutes / 60)))
+                          : '—'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>

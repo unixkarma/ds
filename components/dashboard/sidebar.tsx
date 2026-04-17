@@ -12,6 +12,7 @@ import {
   BarChart3,
   Package,
   Settings,
+  ClipboardList,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -21,6 +22,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/students', label: 'Students', icon: Users },
   { href: '/dashboard/instructors', label: 'Instructors', icon: UserCheck },
+  { href: '/dashboard/applications', label: 'Applications', icon: ClipboardList, badge: true },
   { href: '/dashboard/schedule', label: 'Schedule', icon: Calendar },
   { href: '/dashboard/vehicles', label: 'Vehicles', icon: Car },
   { href: '/dashboard/packages', label: 'Packages', icon: Package },
@@ -31,9 +33,10 @@ const navItems = [
 
 interface SidebarProps {
   schoolName: string
+  pendingApplications?: number
 }
 
-export function Sidebar({ schoolName }: SidebarProps) {
+export function Sidebar({ schoolName, pendingApplications = 0 }: SidebarProps) {
   const pathname = usePathname()
 
   return (
@@ -72,6 +75,11 @@ export function Sidebar({ schoolName }: SidebarProps) {
             >
               <Icon className="h-4 w-4 flex-shrink-0" />
               {item.label}
+              {item.badge && pendingApplications > 0 && (
+                <span className="ml-auto inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-destructive text-destructive-foreground text-xs font-semibold">
+                  {pendingApplications}
+                </span>
+              )}
             </Link>
           )
         })}

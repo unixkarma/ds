@@ -27,7 +27,8 @@ interface InstructorHeaderProps {
 
 const navLinks = [
   { href: '/instructor', label: 'Dashboard', exact: true },
-  { href: '/instructor/schedule', label: 'My Schedule' },
+  { href: '/instructor/calendar', label: 'Calendar' },
+  { href: '/instructor/schedule', label: 'Schedule' },
   { href: '/instructor/availability', label: 'Availability' },
   { href: '/instructor/earnings', label: 'Earnings' },
 ]

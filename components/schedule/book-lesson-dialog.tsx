@@ -32,6 +32,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { PlacesAutocomplete } from '@/components/ui/places-autocomplete'
 import type { StudentWithUser, InstructorWithUser, Vehicle } from '@/types'
 
 // All fields z.string() — avoid react-hook-form resolver type conflicts
@@ -44,7 +45,7 @@ const bookLessonSchema = z.object({
   vehicleId: z.string(),
   pickupLocation: z.string(),
   dropoffLocation: z.string(),
-  notes: z.string(),
+  notesAdditional: z.string().max(150, 'Max 150 characters'),
 })
 
 type BookLessonValues = z.infer<typeof bookLessonSchema>
@@ -81,7 +82,7 @@ export function BookLessonDialog({
       vehicleId: '',
       pickupLocation: '',
       dropoffLocation: '',
-      notes: '',
+      notesAdditional: '',
     },
   })
 
@@ -103,7 +104,7 @@ export function BookLessonDialog({
           vehicleId: values.vehicleId && values.vehicleId !== 'none' ? values.vehicleId : null,
           pickupLocation: values.pickupLocation || '',
           dropoffLocation: values.dropoffLocation || '',
-          notes: values.notes || null,
+          notesAdditional: values.notesAdditional || '',
         }),
       })
 
@@ -279,7 +280,7 @@ export function BookLessonDialog({
             </div>
 
             {/* Pickup / Dropoff */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
                 name="pickupLocation"
@@ -287,7 +288,11 @@ export function BookLessonDialog({
                   <FormItem>
                     <FormLabel>Pickup Location</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. 123 Main St" {...field} />
+                      <PlacesAutocomplete
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Search pickup address..."
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -300,7 +305,11 @@ export function BookLessonDialog({
                   <FormItem>
                     <FormLabel>Dropoff Location</FormLabel>
                     <FormControl>
-                      <Input placeholder="e.g. 456 Oak Ave" {...field} />
+                      <PlacesAutocomplete
+                        value={field.value}
+                        onChange={field.onChange}
+                        placeholder="Search dropoff address..."
+                      />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -311,16 +320,17 @@ export function BookLessonDialog({
             {/* Notes */}
             <FormField
               control={form.control}
-              name="notes"
+              name="notesAdditional"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    Notes{' '}
-                    <span className="text-muted-foreground font-normal">(optional)</span>
+                    Additional Notes{' '}
+                    <span className="text-muted-foreground font-normal">(optional, max 150 chars)</span>
                   </FormLabel>
                   <FormControl>
                     <Textarea
                       rows={2}
+                      maxLength={150}
                       placeholder="Any special instructions or notes..."
                       {...field}
                     />

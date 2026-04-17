@@ -102,6 +102,8 @@ export interface Instructor {
   lesson_price_cents: number | null
   uses_school_vehicle: boolean
   vehicle_monthly_fee_cents: number
+  service_area: string
+  buffer_minutes: number
 }
 
 export interface InstructorWithUser extends Instructor {
@@ -137,7 +139,9 @@ export interface Lesson {
   scheduled_at: string
   duration_minutes: number
   status: LessonStatus
-  notes: string | null
+  notes_covered: string
+  notes_practice: string
+  notes_additional: string
   pickup_location: string
   dropoff_location: string
   sold_by: LessonSoldBy
@@ -202,6 +206,26 @@ export interface PaginatedResponse<T> {
   count: number
   page: number
   pageSize: number
+}
+
+// ── Instructor Applications ──────────────────────────────────
+export type ApplicationStatus = 'pending' | 'approved' | 'rejected'
+
+export interface InstructorApplication {
+  id: string
+  school_id: string
+  first_name: string
+  last_name: string
+  email: string
+  phone: string
+  workers_comp_doc_url: string | null
+  car_insurance_doc_url: string | null
+  service_area: string
+  status: ApplicationStatus
+  admin_notes: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  created_at: string
 }
 
 // Dashboard summary card data

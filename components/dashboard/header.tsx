@@ -31,9 +31,10 @@ interface HeaderProps {
     email: string
   }
   schoolName: string
+  pendingApplications?: number
 }
 
-export function Header({ user, schoolName }: HeaderProps) {
+export function Header({ user, schoolName, pendingApplications = 0 }: HeaderProps) {
   const router = useRouter()
 
   async function handleLogout() {
@@ -62,7 +63,7 @@ export function Header({ user, schoolName }: HeaderProps) {
             <SheetHeader className="sr-only">
               <SheetTitle>Navigation</SheetTitle>
             </SheetHeader>
-            <Sidebar schoolName={schoolName} />
+            <Sidebar schoolName={schoolName} pendingApplications={pendingApplications} />
           </SheetContent>
         </Sheet>
 

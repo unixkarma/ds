@@ -18,6 +18,8 @@ const updateInstructorSchema = z.object({
   lessonPriceCents: z.number().int().min(0).nullable().optional(),
   usesSchoolVehicle: z.boolean().optional(),
   vehicleMonthlyFeeCents: z.number().int().min(0).optional(),
+  serviceArea: z.string().optional(),
+  bufferMinutes: z.number().int().min(0).max(60).optional(),
 })
 
 export async function PATCH(
@@ -77,6 +79,8 @@ export async function PATCH(
   if (updates.lessonPriceCents !== undefined) instructorUpdates.lesson_price_cents = updates.lessonPriceCents
   if (updates.usesSchoolVehicle !== undefined) instructorUpdates.uses_school_vehicle = updates.usesSchoolVehicle
   if (updates.vehicleMonthlyFeeCents !== undefined) instructorUpdates.vehicle_monthly_fee_cents = updates.vehicleMonthlyFeeCents
+  if (updates.serviceArea !== undefined) instructorUpdates.service_area = updates.serviceArea
+  if (updates.bufferMinutes !== undefined) instructorUpdates.buffer_minutes = updates.bufferMinutes
 
   const userUpdates: Record<string, unknown> = {}
   if (updates.firstName !== undefined) userUpdates.first_name = updates.firstName

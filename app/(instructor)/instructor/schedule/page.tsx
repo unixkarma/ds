@@ -69,7 +69,7 @@ export default async function InstructorSchedulePage() {
               No upcoming lessons.
             </p>
           ) : (
-            <LessonTable lessons={upcoming} />
+            <LessonList lessons={upcoming} />
           )}
         </CardContent>
       </Card>
@@ -85,7 +85,7 @@ export default async function InstructorSchedulePage() {
               No past lessons.
             </p>
           ) : (
-            <LessonTable lessons={past} />
+            <LessonList lessons={past} />
           )}
         </CardContent>
       </Card>
@@ -93,61 +93,99 @@ export default async function InstructorSchedulePage() {
   )
 }
 
-function LessonTable({ lessons }: { lessons: LessonWithRelations[] }) {
+function LessonList({ lessons }: { lessons: LessonWithRelations[] }) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b text-muted-foreground text-xs uppercase">
-            <th className="text-left pb-2 font-medium">Date & Time</th>
-            <th className="text-left pb-2 font-medium">Student</th>
-            <th className="text-left pb-2 font-medium">Duration</th>
-            <th className="text-left pb-2 font-medium">Vehicle</th>
-            <th className="text-left pb-2 font-medium">Status</th>
-            <th className="text-left pb-2 font-medium hidden lg:table-cell">Notes</th>
-            <th className="text-left pb-2 font-medium">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y">
-          {lessons.map(lesson => {
-            const start = new Date(lesson.scheduled_at)
-            return (
-              <tr key={lesson.id}>
-                <td className="py-2.5 pr-4">
-                  <div className="font-medium">{format(start, 'MMM d, yyyy')}</div>
-                  <div className="text-xs text-muted-foreground">{format(start, 'h:mm a')}</div>
-                </td>
-                <td className="py-2.5 pr-4">
+    <div className="space-y-3">
+      {lessons.map(lesson => {
+        const start = new Date(lesson.scheduled_at)
+        const hasNotes = lesson.notes_covered || lesson.notes_practice || lesson.notes_additional
+
+        return (
+          <div key={lesson.id} className="border rounded-lg p-3 space-y-2">
+            {/* Top row: date, student, status */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-medium text-sm">
+                  {format(start, 'MMM d, yyyy')} · {format(start, 'h:mm a')}
+                </p>
+                <p className="text-sm text-muted-foreground">
                   {lesson.student.user.first_name} {lesson.student.user.last_name}
-                </td>
-                <td className="py-2.5 pr-4">{lesson.duration_minutes} min</td>
-                <td className="py-2.5 pr-4 text-muted-foreground">
-                  {lesson.vehicle
-                    ? `${lesson.vehicle.year} ${lesson.vehicle.make} ${lesson.vehicle.model}`
-                    : '—'}
-                </td>
-                <td className="py-2.5">
-                  <Badge variant={STATUS_BADGE[lesson.status]}>
-                    {lesson.status.replace('_', ' ')}
-                  </Badge>
-                </td>
-                <td className="py-2.5 hidden lg:table-cell">
-                  {lesson.notes ? (
-                    <p className="text-xs text-muted-foreground max-w-[200px] truncate" title={lesson.notes}>
-                      {lesson.notes}
-                    </p>
-                  ) : (
-                    <span className="text-xs text-muted-foreground">—</span>
-                  )}
-                </td>
-                <td className="py-2.5">
-                  <LessonActions lessonId={lesson.id} status={lesson.status} existingNotes={lesson.notes} />
-                </td>
-              </tr>
-            )
-          })}
-        </tbody>
-      </table>
+                  <span className="mx-1.5">·</span>
+                  {lesson.duration_minutes} min
+                </p>
+                {lesson.vehicle && (
+                  <p className="text-xs text-muted-foreground">
+                    {lesson.vehicle.year} {lesson.vehicle.make} {lesson.vehicle.model}
+                  </p>
+                )}
+              </div>
+              <Badge variant={STATUS_BADGE[lesson.status]} className="shrink-0">
+                {lesson.status.replace('_', ' ')}
+              </Badge>
+            </div>
+
+            {/* Locations */}
+            {(lesson.pickup_location || lesson.dropoff_location) && (
+              <div className="text-xs text-muted-foreground space-y-0.5 pt-1 border-t">
+                {lesson.pickup_location && (
+                  <p>
+                    <span className="font-medium">Pickup:</span>{' '}
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lesson.pickup_location)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      {lesson.pickup_location}
+                    </a>
+                  </p>
+                )}
+                {lesson.dropoff_location && (
+                  <p>
+                    <span className="font-medium">Dropoff:</span>{' '}
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lesson.dropoff_location)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary hover:underline"
+                    >
+                      {lesson.dropoff_location}
+                    </a>
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Notes */}
+            {hasNotes && (
+              <div className="text-xs text-muted-foreground space-y-0.5 pt-1 border-t">
+                {lesson.notes_covered && (
+                  <p><span className="font-medium">Covered:</span> {lesson.notes_covered}</p>
+                )}
+                {lesson.notes_practice && (
+                  <p><span className="font-medium">Practice:</span> {lesson.notes_practice}</p>
+                )}
+                {lesson.notes_additional && (
+                  <p><span className="font-medium">Notes:</span> {lesson.notes_additional}</p>
+                )}
+              </div>
+            )}
+
+            {/* Actions */}
+            {lesson.status === 'scheduled' && (
+              <div className="pt-1">
+                <LessonActions
+                  lessonId={lesson.id}
+                  status={lesson.status}
+                  existingNotesCovered={lesson.notes_covered}
+                  existingNotesPractice={lesson.notes_practice}
+                  existingNotesAdditional={lesson.notes_additional}
+                />
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }

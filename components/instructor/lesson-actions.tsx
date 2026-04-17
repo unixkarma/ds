@@ -29,26 +29,41 @@ import {
 interface LessonActionsProps {
   lessonId: string
   status: string
-  existingNotes?: string | null
+  existingNotesCovered?: string
+  existingNotesPractice?: string
+  existingNotesAdditional?: string
 }
 
-export function LessonActions({ lessonId, status, existingNotes }: LessonActionsProps) {
+export function LessonActions({
+  lessonId,
+  status,
+  existingNotesCovered = '',
+  existingNotesPractice = '',
+  existingNotesAdditional = '',
+}: LessonActionsProps) {
   const router = useRouter()
   const [loading, setLoading] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [completeDialogOpen, setCompleteDialogOpen] = useState(false)
-  const [notes, setNotes] = useState(existingNotes ?? '')
+  const [notesCovered, setNotesCovered] = useState(existingNotesCovered)
+  const [notesPractice, setNotesPractice] = useState(existingNotesPractice)
+  const [notesAdditional, setNotesAdditional] = useState(existingNotesAdditional)
 
   if (status !== 'scheduled') return null
 
-  async function handleAction(newStatus: 'completed' | 'no_show' | 'cancelled', lessonNotes?: string) {
+  async function handleAction(
+    newStatus: 'completed' | 'no_show' | 'cancelled',
+    lessonNotes?: { covered: string; practice: string; additional: string },
+  ) {
     setLoading(newStatus)
     setError(null)
 
     try {
       const body: Record<string, unknown> = { status: newStatus }
-      if (lessonNotes !== undefined) {
-        body.notes = lessonNotes || null
+      if (lessonNotes) {
+        body.notesCovered = lessonNotes.covered
+        body.notesPractice = lessonNotes.practice
+        body.notesAdditional = lessonNotes.additional
       }
 
       const res = await fetch(`/api/lessons/${lessonId}`, {
@@ -73,42 +88,65 @@ export function LessonActions({ lessonId, status, existingNotes }: LessonActions
   }
 
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex flex-wrap items-center gap-1.5">
       {error && (
-        <span className="text-xs text-destructive mr-2">{error}</span>
+        <span className="text-xs text-destructive w-full mb-1">{error}</span>
       )}
 
       {/* Complete — opens notes dialog */}
       <Button
         size="sm"
-        variant="ghost"
-        className="h-7 w-7 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50"
+        variant="outline"
+        className="h-8 text-emerald-600 border-emerald-200 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-300"
         onClick={() => setCompleteDialogOpen(true)}
         disabled={!!loading}
-        title="Mark Complete"
       >
-        <CheckCircle className="h-4 w-4" />
+        <CheckCircle className="mr-1.5 h-3.5 w-3.5" />
+        Complete
       </Button>
 
       {/* Complete dialog with notes */}
       <Dialog open={completeDialogOpen} onOpenChange={setCompleteDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Complete Lesson</DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
             <div className="space-y-1.5">
-              <Label htmlFor="lesson-notes">Lesson Notes</Label>
+              <Label htmlFor="notes-covered">What was covered</Label>
               <Textarea
-                id="lesson-notes"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="What did you cover? Any areas to focus on next time? (e.g. parallel parking needs more practice, highway driving went well...)"
-                rows={4}
+                id="notes-covered"
+                value={notesCovered}
+                onChange={(e) => setNotesCovered(e.target.value)}
+                maxLength={150}
+                placeholder="e.g. Parallel parking, highway merging, three-point turns"
+                rows={2}
               />
-              <p className="text-xs text-muted-foreground">
-                These notes help the next instructor see the student&apos;s progress.
-              </p>
+              <p className="text-xs text-muted-foreground text-right">{notesCovered.length}/150</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="notes-practice">Needs to practice on</Label>
+              <Textarea
+                id="notes-practice"
+                value={notesPractice}
+                onChange={(e) => setNotesPractice(e.target.value)}
+                maxLength={150}
+                placeholder="e.g. Mirror checks before lane changes, smoother braking"
+                rows={2}
+              />
+              <p className="text-xs text-muted-foreground text-right">{notesPractice.length}/150</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="notes-additional">Additional notes</Label>
+              <Textarea
+                id="notes-additional"
+                value={notesAdditional}
+                onChange={(e) => setNotesAdditional(e.target.value)}
+                maxLength={150}
+                placeholder="Any other observations..."
+                rows={2}
+              />
+              <p className="text-xs text-muted-foreground text-right">{notesAdditional.length}/150</p>
             </div>
           </div>
           <DialogFooter>
@@ -120,7 +158,11 @@ export function LessonActions({ lessonId, status, existingNotes }: LessonActions
               Cancel
             </Button>
             <Button
-              onClick={() => handleAction('completed', notes)}
+              onClick={() => handleAction('completed', {
+                covered: notesCovered,
+                practice: notesPractice,
+                additional: notesAdditional,
+              })}
               disabled={!!loading}
               className="bg-emerald-600 hover:bg-emerald-700 text-white"
             >
@@ -134,17 +176,17 @@ export function LessonActions({ lessonId, status, existingNotes }: LessonActions
       {/* No Show */}
       <Button
         size="sm"
-        variant="ghost"
-        className="h-7 w-7 p-0 text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+        variant="outline"
+        className="h-8 text-amber-600 border-amber-200 hover:text-amber-700 hover:bg-amber-50 hover:border-amber-300"
         onClick={() => handleAction('no_show')}
         disabled={!!loading}
-        title="No Show"
       >
         {loading === 'no_show' ? (
-          <Loader2 className="h-4 w-4 animate-spin" />
+          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
         ) : (
-          <XCircle className="h-4 w-4" />
+          <XCircle className="mr-1.5 h-3.5 w-3.5" />
         )}
+        No Show
       </Button>
 
       {/* Cancel */}
@@ -152,16 +194,16 @@ export function LessonActions({ lessonId, status, existingNotes }: LessonActions
         <AlertDialogTrigger asChild>
           <Button
             size="sm"
-            variant="ghost"
-            className="h-7 w-7 p-0 text-destructive hover:text-destructive hover:bg-red-50"
+            variant="outline"
+            className="h-8 text-destructive border-red-200 hover:text-destructive hover:bg-red-50 hover:border-red-300"
             disabled={!!loading}
-            title="Cancel Lesson"
           >
             {loading === 'cancelled' ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
+              <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
             ) : (
-              <Ban className="h-4 w-4" />
+              <Ban className="mr-1.5 h-3.5 w-3.5" />
             )}
+            Cancel
           </Button>
         </AlertDialogTrigger>
         <AlertDialogContent>

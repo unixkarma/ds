@@ -4,6 +4,7 @@ import { type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { Sidebar } from '@/components/dashboard/sidebar'
 import { Header } from '@/components/dashboard/header'
+import { getPendingApplicationsCount } from '@/lib/services/applications'
 
 // Protect all /dashboard/* routes — server-side auth check
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
@@ -28,11 +29,13 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const schoolName =
     (profile?.school as unknown as { name: string } | null)?.name ?? 'My School'
 
+  const pendingApplications = await getPendingApplicationsCount()
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Desktop sidebar — hidden on mobile */}
       <aside className="hidden md:flex md:flex-col md:w-60 border-r flex-shrink-0">
-        <Sidebar schoolName={schoolName} />
+        <Sidebar schoolName={schoolName} pendingApplications={pendingApplications} />
       </aside>
 
       {/* Main area */}
@@ -44,6 +47,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
             email: user.email ?? '',
           }}
           schoolName={schoolName}
+          pendingApplications={pendingApplications}
         />
 
         {/* Page content */}

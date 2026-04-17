@@ -97,50 +97,44 @@ export default async function StudentPortalPage() {
               No past lessons yet.
             </p>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b text-muted-foreground text-xs uppercase">
-                    <th className="text-left pb-2 font-medium">Date</th>
-                    <th className="text-left pb-2 font-medium">Instructor</th>
-                    <th className="text-left pb-2 font-medium">Duration</th>
-                    <th className="text-left pb-2 font-medium">Status</th>
-                    <th className="text-left pb-2 font-medium hidden md:table-cell">Notes</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {recentLessons.map(lesson => {
-                    const start = new Date(lesson.scheduled_at)
-                    return (
-                      <tr key={lesson.id} className="py-2">
-                        <td className="py-2.5 pr-4">
-                          <div className="font-medium">{format(start, 'MMM d, yyyy')}</div>
-                          <div className="text-xs text-muted-foreground">{format(start, 'h:mm a')}</div>
-                        </td>
-                        <td className="py-2.5 pr-4">
+            <div className="space-y-3">
+              {recentLessons.map(lesson => {
+                const start = new Date(lesson.scheduled_at)
+                const hasNotes = lesson.notes_covered || lesson.notes_practice || lesson.notes_additional
+                return (
+                  <div key={lesson.id} className="border rounded-lg p-3 space-y-1.5">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-medium text-sm">
+                          {format(start, 'MMM d, yyyy')} · {format(start, 'h:mm a')}
+                        </p>
+                        <p className="text-sm text-muted-foreground">
                           {lesson.instructor.user.first_name}{' '}
                           {lesson.instructor.user.last_name}
-                        </td>
-                        <td className="py-2.5 pr-4">{lesson.duration_minutes} min</td>
-                        <td className="py-2.5">
-                          <Badge variant={STATUS_BADGE[lesson.status]}>
-                            {lesson.status.replace('_', ' ')}
-                          </Badge>
-                        </td>
-                        <td className="py-2.5 hidden md:table-cell">
-                          {lesson.notes ? (
-                            <p className="text-xs text-muted-foreground max-w-[250px] truncate" title={lesson.notes}>
-                              {lesson.notes}
-                            </p>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">—</span>
-                          )}
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                          <span className="mx-1.5">·</span>
+                          {lesson.duration_minutes} min
+                        </p>
+                      </div>
+                      <Badge variant={STATUS_BADGE[lesson.status]} className="shrink-0">
+                        {lesson.status.replace('_', ' ')}
+                      </Badge>
+                    </div>
+                    {hasNotes && (
+                      <div className="text-xs text-muted-foreground space-y-0.5 pt-1 border-t">
+                        {lesson.notes_covered && (
+                          <p><span className="font-medium">Covered:</span> {lesson.notes_covered}</p>
+                        )}
+                        {lesson.notes_practice && (
+                          <p><span className="font-medium">Practice:</span> {lesson.notes_practice}</p>
+                        )}
+                        {lesson.notes_additional && (
+                          <p><span className="font-medium">Notes:</span> {lesson.notes_additional}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           )}
         </CardContent>
@@ -200,6 +194,11 @@ function UpcomingLessonRow({ lesson }: { lesson: LessonWithRelations }) {
         <p className="text-sm text-muted-foreground">
           with {lesson.instructor.user.first_name} {lesson.instructor.user.last_name}
         </p>
+        {lesson.instructor.service_area && (
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Area: {lesson.instructor.service_area}
+          </p>
+        )}
         {lesson.vehicle && (
           <p className="text-xs text-muted-foreground mt-0.5">
             {lesson.vehicle.year} {lesson.vehicle.make} {lesson.vehicle.model}
