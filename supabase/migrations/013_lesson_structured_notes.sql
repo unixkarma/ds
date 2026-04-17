@@ -1,10 +1,9 @@
 -- ============================================================
--- HelixDriving — Migration 011: Structured Lesson Notes
+-- HelixDriving - Migration 013: Structured Lesson Notes
 -- Replaces single `notes` with three 150-char fields.
--- Run this in: Supabase Dashboard → SQL Editor
+-- Run this in: Supabase Dashboard -> SQL Editor
 -- ============================================================
 
--- Add new structured note columns
 ALTER TABLE lessons
   ADD COLUMN IF NOT EXISTS notes_covered TEXT NOT NULL DEFAULT ''
     CHECK (char_length(notes_covered) <= 150),
@@ -13,10 +12,19 @@ ALTER TABLE lessons
   ADD COLUMN IF NOT EXISTS notes_additional TEXT NOT NULL DEFAULT ''
     CHECK (char_length(notes_additional) <= 150);
 
--- Migrate existing notes data to notes_additional (truncate if over 150)
-UPDATE lessons
-  SET notes_additional = LEFT(COALESCE(notes, ''), 150)
-  WHERE notes IS NOT NULL AND notes != '';
+-- Migrate legacy `notes` column into `notes_additional`, only if it still exists
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'lessons'
+      AND column_name = 'notes'
+  ) THEN
+    UPDATE lessons
+      SET notes_additional = LEFT(COALESCE(notes, ''), 150)
+      WHERE notes IS NOT NULL AND notes != '';
 
--- Drop the old notes column
-ALTER TABLE lessons DROP COLUMN IF EXISTS notes;
+    ALTER TABLE lessons DROP COLUMN notes;
+  END IF;
+END$$;

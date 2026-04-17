@@ -1,10 +1,11 @@
 -- ============================================================
--- DSS — Driving School Software
--- Migration 005: Fix auth trigger for API-created users
+-- HelixDriving - Migration 007: Fix auth trigger for API-created users
 -- The handle_new_user_registration trigger should only fire for
 -- admin sign-ups (which pass school_name in metadata).
 -- Students/instructors created via API already have their
 -- users + students rows inserted by the API route.
+-- Depends on: registration_code column from migration 006.
+-- Run this in: Supabase Dashboard -> SQL Editor
 -- ============================================================
 
 CREATE OR REPLACE FUNCTION handle_new_user_registration()

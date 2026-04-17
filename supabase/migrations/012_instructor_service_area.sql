@@ -1,7 +1,7 @@
 -- ============================================================
--- HelixDriving — Migration 010: Instructor Service Area
+-- HelixDriving - Migration 012: Instructor Service Area
 -- Adds service_area to instructors and instructor_applications.
--- Run this in: Supabase Dashboard → SQL Editor
+-- Run this in: Supabase Dashboard -> SQL Editor
 -- ============================================================
 
 ALTER TABLE instructors
