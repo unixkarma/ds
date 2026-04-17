@@ -1,7 +1,7 @@
 -- ============================================================
--- HelixDriving — Migration 012: Instructor Buffer Between Lessons
+-- HelixDriving - Migration 014: Instructor Buffer Between Lessons
 -- Adds configurable travel/buffer time between consecutive lessons.
--- Run this in: Supabase Dashboard → SQL Editor
+-- Run this in: Supabase Dashboard -> SQL Editor
 -- ============================================================
 
 ALTER TABLE instructors

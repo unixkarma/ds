@@ -1,7 +1,7 @@
 -- ============================================================
--- HelixDriving — Migration 006: Instructor Contractor Model
+-- HelixDriving - Migration 008: Instructor Contractor Model
 -- Adds modality, earnings, cancellation fees, and booking limits.
--- Run this in: Supabase Dashboard → SQL Editor
+-- Run this in: Supabase Dashboard -> SQL Editor
 -- ============================================================
 
 -- ── Instructor contractor fields ─────────────────────────────
