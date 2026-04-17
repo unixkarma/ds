@@ -10,7 +10,9 @@ const updateLessonSchema = z.object({
   scheduledAt: z.string().datetime().optional(),
   durationMinutes: z.number().int().min(15).max(240).optional(),
   vehicleId: z.string().uuid().nullable().optional(),
-  notes: z.string().nullable().optional(),
+  notesCovered: z.string().max(150).optional(),
+  notesPractice: z.string().max(150).optional(),
+  notesAdditional: z.string().max(150).optional(),
   pickupLocation: z.string().optional(),
   dropoffLocation: z.string().optional(),
 })
@@ -105,7 +107,9 @@ export async function PATCH(
   if (updates.scheduledAt !== undefined) lessonUpdates.scheduled_at = updates.scheduledAt
   if (updates.durationMinutes !== undefined) lessonUpdates.duration_minutes = updates.durationMinutes
   if (updates.vehicleId !== undefined) lessonUpdates.vehicle_id = updates.vehicleId
-  if (updates.notes !== undefined) lessonUpdates.notes = updates.notes
+  if (updates.notesCovered !== undefined) lessonUpdates.notes_covered = updates.notesCovered
+  if (updates.notesPractice !== undefined) lessonUpdates.notes_practice = updates.notesPractice
+  if (updates.notesAdditional !== undefined) lessonUpdates.notes_additional = updates.notesAdditional
   if (updates.pickupLocation !== undefined) lessonUpdates.pickup_location = updates.pickupLocation
   if (updates.dropoffLocation !== undefined) lessonUpdates.dropoff_location = updates.dropoffLocation
 

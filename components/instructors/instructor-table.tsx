@@ -34,7 +34,8 @@ export function InstructorTable({ instructors }: InstructorTableProps) {
     return (
       getFullName(inst.user).toLowerCase().includes(q) ||
       inst.user.email.toLowerCase().includes(q) ||
-      inst.license_number.toLowerCase().includes(q)
+      inst.license_number.toLowerCase().includes(q) ||
+      inst.service_area.toLowerCase().includes(q)
     )
   })
 
@@ -116,6 +117,9 @@ export function InstructorTable({ instructors }: InstructorTableProps) {
                 <th className="text-left font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">
                   License
                 </th>
+                <th className="text-left font-medium text-muted-foreground px-4 py-3 hidden lg:table-cell">
+                  Service Area
+                </th>
                 <th className="text-left font-medium text-muted-foreground px-4 py-3 hidden sm:table-cell">
                   Max / Day
                 </th>
@@ -140,6 +144,11 @@ export function InstructorTable({ instructors }: InstructorTableProps) {
                   </td>
                   <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground">
                     {inst.license_number || '—'}
+                  </td>
+                  <td className="px-4 py-3 hidden lg:table-cell text-muted-foreground">
+                    <span className="max-w-[200px] truncate block" title={inst.service_area || undefined}>
+                      {inst.service_area || '—'}
+                    </span>
                   </td>
                   <td className="px-4 py-3 hidden sm:table-cell text-muted-foreground">
                     {inst.max_lessons_per_day}

@@ -132,7 +132,7 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
 
   return (
     <Dialog open={!!lesson} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Lesson Details</DialogTitle>
         </DialogHeader>
@@ -178,20 +178,50 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
 
           {lesson.pickup_location && (
             <Row label="Pickup">
-              {lesson.pickup_location}
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lesson.pickup_location)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                {lesson.pickup_location}
+              </a>
             </Row>
           )}
 
           {lesson.dropoff_location && (
             <Row label="Dropoff">
-              {lesson.dropoff_location}
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(lesson.dropoff_location)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:underline"
+              >
+                {lesson.dropoff_location}
+              </a>
             </Row>
           )}
 
-          {lesson.notes && (
-            <div className="pt-1">
-              <p className="text-muted-foreground mb-1">Notes</p>
-              <p className="bg-muted rounded-md p-2 text-sm">{lesson.notes}</p>
+          {(lesson.notes_covered || lesson.notes_practice || lesson.notes_additional) && (
+            <div className="pt-1 space-y-2">
+              {lesson.notes_covered && (
+                <div>
+                  <p className="text-muted-foreground mb-0.5 text-xs font-medium">What was covered</p>
+                  <p className="bg-muted rounded-md p-2 text-sm">{lesson.notes_covered}</p>
+                </div>
+              )}
+              {lesson.notes_practice && (
+                <div>
+                  <p className="text-muted-foreground mb-0.5 text-xs font-medium">Needs to practice on</p>
+                  <p className="bg-muted rounded-md p-2 text-sm">{lesson.notes_practice}</p>
+                </div>
+              )}
+              {lesson.notes_additional && (
+                <div>
+                  <p className="text-muted-foreground mb-0.5 text-xs font-medium">Additional notes</p>
+                  <p className="bg-muted rounded-md p-2 text-sm">{lesson.notes_additional}</p>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -18,6 +18,7 @@ import {
   FormMessage,
 } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
@@ -46,6 +47,8 @@ const instructorFormSchema = z.object({
   lessonPriceCents: z.string(),
   usesSchoolVehicle: z.boolean(),
   vehicleMonthlyFeeCents: z.string(),
+  serviceArea: z.string(),
+  bufferMinutes: z.string(),
 })
 
 type InstructorFormValues = z.infer<typeof instructorFormSchema>
@@ -79,6 +82,8 @@ export function InstructorForm({ instructor, schoolBasePriceCents = 0 }: Instruc
         : '',
       usesSchoolVehicle: instructor?.uses_school_vehicle ?? false,
       vehicleMonthlyFeeCents: String((instructor?.vehicle_monthly_fee_cents ?? 27200) / 100),
+      serviceArea: instructor?.service_area ?? '',
+      bufferMinutes: String(instructor?.buffer_minutes ?? 0),
     },
   })
 
@@ -146,6 +151,8 @@ export function InstructorForm({ instructor, schoolBasePriceCents = 0 }: Instruc
             phone: values.phone,
             licenseNumber: values.licenseNumber,
             maxLessonsPerDay: parseInt(values.maxLessonsPerDay, 10) || 6,
+            serviceArea: values.serviceArea,
+            bufferMinutes: parseInt(values.bufferMinutes, 10) || 0,
             ...contractorFields,
           }),
         })
@@ -161,6 +168,8 @@ export function InstructorForm({ instructor, schoolBasePriceCents = 0 }: Instruc
             phone: values.phone,
             licenseNumber: values.licenseNumber,
             maxLessonsPerDay: parseInt(values.maxLessonsPerDay, 10) || 6,
+            serviceArea: values.serviceArea,
+            bufferMinutes: parseInt(values.bufferMinutes, 10) || 0,
             ...contractorFields,
           }),
         })
@@ -297,7 +306,57 @@ export function InstructorForm({ instructor, schoolBasePriceCents = 0 }: Instruc
           />
         </div>
 
-        {/* ── Contractor Settings ───────────────────────────────── */}
+        <FormField
+          control={form.control}
+          name="bufferMinutes"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Buffer Between Lessons <span className="text-muted-foreground font-normal">(minutes)</span></FormLabel>
+              <Select onValueChange={field.onChange} value={field.value}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="0">No buffer</SelectItem>
+                  <SelectItem value="5">5 min</SelectItem>
+                  <SelectItem value="10">10 min</SelectItem>
+                  <SelectItem value="15">15 min</SelectItem>
+                  <SelectItem value="20">20 min</SelectItem>
+                  <SelectItem value="30">30 min</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormDescription>
+                Travel time between lesson locations. Available slots will be spaced accordingly.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        <FormField
+          control={form.control}
+          name="serviceArea"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Service Area <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+              <FormControl>
+                <Textarea
+                  rows={2}
+                  placeholder="e.g. North Side Chicago, Lincoln Park, 60614, 60657"
+                  {...field}
+                />
+              </FormControl>
+              <FormDescription>
+                Neighborhoods, cities, or zip codes where this instructor provides lessons.
+              </FormDescription>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* ── Contractor Settings ────────────────���──────────────── */}
         <div className="border-t pt-5 mt-5">
           <h3 className="text-sm font-semibold mb-4">Contractor Settings</h3>
 

@@ -184,12 +184,13 @@ export function ScheduleClient({
   return (
     <div className="space-y-4">
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-3 flex-wrap">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {/* Nav arrows */}
           <Button
             variant="outline"
             size="icon"
+            className="h-9 w-9"
             onClick={viewMode === 'multi' ? goToPrevDay : goToPrevWeek}
             disabled={isLoadingWeek}
           >
@@ -198,6 +199,7 @@ export function ScheduleClient({
           <Button
             variant="outline"
             size="icon"
+            className="h-9 w-9"
             onClick={viewMode === 'multi' ? goToNextDay : goToNextWeek}
             disabled={isLoadingWeek}
           >
@@ -211,7 +213,7 @@ export function ScheduleClient({
           >
             Today
           </Button>
-          <h2 className="text-base font-semibold ml-1 tabular-nums">
+          <h2 className="text-sm sm:text-base font-semibold ml-1 tabular-nums truncate">
             {viewMode === 'multi' ? dayLabel : weekLabel}
           </h2>
         </div>
@@ -220,7 +222,7 @@ export function ScheduleClient({
           {/* Instructor filter — single view only */}
           {viewMode === 'single' && (
             <Select value={selectedInstructorId} onValueChange={setSelectedInstructorId}>
-              <SelectTrigger className="w-[180px] h-9 text-sm">
+              <SelectTrigger className="w-full sm:w-[180px] h-9 text-sm">
                 <SelectValue placeholder="All Instructors" />
               </SelectTrigger>
               <SelectContent>
@@ -245,7 +247,7 @@ export function ScheduleClient({
               onClick={() => switchView('single')}
             >
               <User className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Single</span>
+              Single
             </Button>
             <Button
               variant={viewMode === 'multi' ? 'default' : 'ghost'}
@@ -254,7 +256,7 @@ export function ScheduleClient({
               onClick={() => switchView('multi')}
             >
               <Users className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Multi</span>
+              Multi
             </Button>
           </div>
 

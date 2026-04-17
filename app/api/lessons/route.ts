@@ -44,7 +44,9 @@ const createLessonSchema = z.object({
   scheduledAt: z.string().datetime(),
   durationMinutes: z.number().int().min(15).max(240).default(60),
   vehicleId: z.string().uuid().nullable().optional(),
-  notes: z.string().optional(),
+  notesCovered: z.string().max(150).optional(),
+  notesPractice: z.string().max(150).optional(),
+  notesAdditional: z.string().max(150).optional(),
   pickupLocation: z.string().optional(),
   dropoffLocation: z.string().optional(),
   soldBy: z.enum(['school', 'instructor']).optional(),
@@ -74,7 +76,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { studentId, instructorId, scheduledAt, durationMinutes, vehicleId, notes, pickupLocation, dropoffLocation, soldBy } = parsed.data
+  const { studentId, instructorId, scheduledAt, durationMinutes, vehicleId, notesCovered, notesPractice, notesAdditional, pickupLocation, dropoffLocation, soldBy } = parsed.data
   const schoolId = profile.school_id
 
   // Determine sold_by: instructors creating lessons = 'instructor', otherwise 'school'
@@ -192,7 +194,9 @@ export async function POST(request: NextRequest) {
       vehicle_id: vehicleId ?? null,
       scheduled_at: scheduledAt,
       duration_minutes: durationMinutes,
-      notes: notes ?? null,
+      notes_covered: notesCovered ?? '',
+      notes_practice: notesPractice ?? '',
+      notes_additional: notesAdditional ?? '',
       pickup_location: pickupLocation ?? '',
       dropoff_location: dropoffLocation ?? '',
       sold_by: resolvedSoldBy,

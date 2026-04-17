@@ -95,7 +95,7 @@ export function BookLessonFlow({ studentId, lessonsRemaining, instructors }: Boo
           scheduledAt,
           durationMinutes: 60,
           vehicleId: null,
-          notes: null,
+          notesAdditional: '',
         }),
       })
 
@@ -199,6 +199,11 @@ export function BookLessonFlow({ studentId, lessonsRemaining, instructors }: Boo
                       </p>
                     ) : (
                       <p className="text-xs text-muted-foreground">No availability set</p>
+                    )}
+                    {inst.service_area && (
+                      <p className="text-xs text-muted-foreground truncate">
+                        Area: {inst.service_area}
+                      </p>
                     )}
                   </div>
                   {isSelected && (
