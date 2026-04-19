@@ -76,8 +76,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
     }
 
-    // Record the payment
-    await adminClient.from('payments').insert({
+    // Insert the payment row first. The UNIQUE index on
+    // stripe_payment_intent_id (migration 017) makes this our
+    // idempotency gate — if Stripe retries the webhook, the insert
+    // fails with 23505 (unique_violation) and we skip crediting.
+    const { error: insertErr } = await adminClient.from('payments').insert({
       school_id: schoolId,
       student_id: studentId,
       package_id: packageId || null,
@@ -86,21 +89,22 @@ export async function POST(request: NextRequest) {
       status: 'completed',
     })
 
-    // Credit lessons to the student
-    const { data: student } = await adminClient
-      .from('students')
-      .select('lessons_remaining, total_lessons_purchased')
-      .eq('id', studentId)
-      .single()
+    if (insertErr) {
+      if (insertErr.code === '23505') {
+        // Duplicate — Stripe retry of an already-processed event
+        return NextResponse.json({ received: true, duplicate: true })
+      }
+      return NextResponse.json({ error: insertErr.message }, { status: 500 })
+    }
 
-    if (student) {
-      await adminClient
-        .from('students')
-        .update({
-          lessons_remaining: (student.lessons_remaining ?? 0) + lessonCount,
-          total_lessons_purchased: student.total_lessons_purchased + lessonCount,
-        })
-        .eq('id', studentId)
+    // Atomic credit via RPC (migration 019) — avoids read-modify-write race.
+    const { error: creditErr } = await adminClient.rpc('credit_student_lessons', {
+      p_student_id: studentId,
+      p_lesson_count: lessonCount,
+    })
+
+    if (creditErr) {
+      return NextResponse.json({ error: creditErr.message }, { status: 500 })
     }
   }
 

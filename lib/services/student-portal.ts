@@ -28,9 +28,9 @@ export async function getStudentPortalData(): Promise<StudentPortalData | null> 
 
   if (studentError || !student) return null
 
-  // Fetch school name
+  // Fetch school name (schools_public view — admins-only access to full schools table)
   const { data: school } = await supabase
-    .from('schools')
+    .from('schools_public')
     .select('name')
     .eq('id', (student.user as unknown as { school_id: string }).school_id ?? student.school_id)
     .single()

@@ -88,18 +88,17 @@ export async function POST(
     return NextResponse.json({ error: uploadError.message }, { status: 500 })
   }
 
-  // Get public URL
-  const { data: urlData } = adminClient.storage
-    .from('permit-photos')
-    .getPublicUrl(storagePath)
-
-  const publicUrl = urlData.publicUrl
-
-  // Update student record
+  // Store the STORAGE PATH in students.permit_photo_url (bucket is private
+  // since migration 018 — signed URLs are generated on read).
   await adminClient
     .from('students')
-    .update({ permit_photo_url: publicUrl })
+    .update({ permit_photo_url: storagePath })
     .eq('id', studentId)
 
-  return NextResponse.json({ url: publicUrl })
+  // Return a signed URL for immediate display in the client.
+  const { data: signed } = await adminClient.storage
+    .from('permit-photos')
+    .createSignedUrl(storagePath, 60 * 60)
+
+  return NextResponse.json({ url: signed?.signedUrl ?? '' })
 }

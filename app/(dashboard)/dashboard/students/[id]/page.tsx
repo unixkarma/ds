@@ -4,6 +4,7 @@ import type { Metadata } from 'next'
 import { ChevronLeft, Mail, Phone, Calendar, FileText, Pencil, ImageIcon } from 'lucide-react'
 
 import { getStudentById } from '@/lib/services/students'
+import { getPermitPhotoSignedUrl } from '@/lib/services/permit-photo'
 import { formatDate, formatDateTime, getFullName } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -45,6 +46,7 @@ export default async function StudentDetailPage({
 
   const remaining = student.total_lessons_purchased - student.total_lessons_completed
   const statusConf = studentStatusConfig[student.status]
+  const permitPhotoUrl = await getPermitPhotoSignedUrl(student.permit_photo_url)
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -146,7 +148,7 @@ export default async function StudentDetailPage({
       </div>
 
       {/* Permit photo */}
-      {student.permit_photo_url && (
+      {permitPhotoUrl && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex items-center gap-2">
@@ -157,7 +159,7 @@ export default async function StudentDetailPage({
           <CardContent>
             <div className="rounded-lg overflow-hidden border bg-muted inline-block">
               <img
-                src={student.permit_photo_url}
+                src={permitPhotoUrl}
                 alt="Learner's permit"
                 className="max-h-[400px] object-contain"
               />

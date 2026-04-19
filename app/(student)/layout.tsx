@@ -29,7 +29,7 @@ export default async function StudentLayout({ children }: { children: ReactNode 
   }
 
   const { data: school } = await supabase
-    .from('schools')
+    .from('schools_public')
     .select('name')
     .eq('id', profile.school_id)
     .single()

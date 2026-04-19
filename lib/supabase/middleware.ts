@@ -59,7 +59,7 @@ export async function updateSession(request: NextRequest) {
       .single()
 
     const url = request.nextUrl.clone()
-    if (profile?.role === 'student' || profile?.role === 'parent') {
+    if (profile?.role === 'student') {
       url.pathname = '/student'
     } else if (profile?.role === 'instructor') {
       url.pathname = '/instructor'

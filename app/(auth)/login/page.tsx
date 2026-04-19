@@ -83,7 +83,7 @@ export default function LoginPage() {
       .single()
 
     // Route to the correct portal based on role
-    if (profile?.role === 'student' || profile?.role === 'parent') {
+    if (profile?.role === 'student') {
       router.push('/student')
     } else if (profile?.role === 'instructor') {
       router.push('/instructor')

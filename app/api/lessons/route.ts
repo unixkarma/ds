@@ -82,9 +82,10 @@ export async function POST(request: NextRequest) {
   // Determine sold_by: instructors creating lessons = 'instructor', otherwise 'school'
   const resolvedSoldBy = soldBy ?? (profile.role === 'instructor' ? 'instructor' : 'school')
 
-  // Fetch school settings for booking limit and pricing
+  // Fetch school settings for booking limit and pricing.
+  // Use schools_public (view) since students can't SELECT the full schools row.
   const { data: school } = await supabase
-    .from('schools')
+    .from('schools_public')
     .select('max_booking_days_ahead, single_lesson_price_cents')
     .eq('id', schoolId)
     .single()
@@ -101,12 +102,15 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Fetch instructor for pricing
+  // Fetch instructor for pricing + buffer_minutes (back-to-back travel time)
   const { data: instructorRecord } = await supabase
     .from('instructors')
-    .select('modality, hourly_rate_cents, lesson_price_cents, commission_rate')
+    .select('modality, hourly_rate_cents, lesson_price_cents, commission_rate, buffer_minutes')
     .eq('id', instructorId)
     .single()
+
+  const bufferMinutes = instructorRecord?.buffer_minutes ?? 0
+  const bufferMs = bufferMinutes * 60 * 1000
 
   // Calculate price_cents for this lesson
   const hours = durationMinutes / 60
@@ -145,45 +149,57 @@ export async function POST(request: NextRequest) {
   const lessonEnd = new Date(lessonStart.getTime() + durationMinutes * 60 * 1000)
 
   // ── Conflict detection ──────────────────────────────────────
-  // Fetch all lessons for this instructor and student on the same day
-  const dayStart = new Date(lessonStart)
-  dayStart.setHours(0, 0, 0, 0)
-  const dayEnd = new Date(dayStart)
-  dayEnd.setDate(dayEnd.getDate() + 1)
+  // Use adminClient so students see conflicts across ALL lessons in the school
+  // (RLS would otherwise restrict them to their own lessons → double-booking risk).
+  // Authorization has already been enforced above.
+  const adminClient = createAdminClient()
 
-  const { data: existingLessons } = await supabase
+  // Fetch lessons overlapping a ±1 day window around the requested slot
+  // (UTC-safe — avoids local-timezone midnight boundaries).
+  const windowStart = new Date(lessonStart.getTime() - 24 * 60 * 60 * 1000)
+  const windowEnd = new Date(lessonStart.getTime() + 24 * 60 * 60 * 1000)
+
+  const { data: existingLessons } = await adminClient
     .from('lessons')
     .select('id, scheduled_at, duration_minutes, instructor_id, student_id')
     .eq('school_id', schoolId)
     .eq('status', 'scheduled')
-    .gte('scheduled_at', dayStart.toISOString())
-    .lt('scheduled_at', dayEnd.toISOString())
+    .gte('scheduled_at', windowStart.toISOString())
+    .lt('scheduled_at', windowEnd.toISOString())
 
   for (const ex of existingLessons ?? []) {
     const exStart = new Date(ex.scheduled_at)
     const exEnd = new Date(exStart.getTime() + ex.duration_minutes * 60 * 1000)
 
-    // Check overlap: [exStart, exEnd) overlaps [lessonStart, lessonEnd)
-    const overlaps = exStart < lessonEnd && exEnd > lessonStart
+    // Student conflict: strict overlap [exStart, exEnd) vs [lessonStart, lessonEnd)
+    const studentOverlaps = exStart < lessonEnd && exEnd > lessonStart
 
-    if (overlaps) {
-      if (ex.instructor_id === instructorId) {
-        return NextResponse.json(
-          { error: 'Instructor already has a lesson at this time.' },
-          { status: 409 }
-        )
-      }
-      if (ex.student_id === studentId) {
-        return NextResponse.json(
-          { error: 'Student already has a lesson at this time.' },
-          { status: 409 }
-        )
-      }
+    // Instructor conflict: pad existing lesson by buffer_minutes on both sides
+    // so back-to-back bookings respect travel/rest time.
+    const exStartBuffered = new Date(exStart.getTime() - bufferMs)
+    const exEndBuffered = new Date(exEnd.getTime() + bufferMs)
+    const instructorOverlaps = exStartBuffered < lessonEnd && exEndBuffered > lessonStart
+
+    if (ex.instructor_id === instructorId && instructorOverlaps) {
+      return NextResponse.json(
+        {
+          error:
+            bufferMinutes > 0
+              ? `Instructor needs a ${bufferMinutes}-minute buffer between lessons. Please pick a later time.`
+              : 'Instructor already has a lesson at this time.',
+        },
+        { status: 409 }
+      )
+    }
+    if (ex.student_id === studentId && studentOverlaps) {
+      return NextResponse.json(
+        { error: 'Student already has a lesson at this time.' },
+        { status: 409 }
+      )
     }
   }
 
   // ── Create the lesson ────────────────────────────────────────
-  const adminClient = createAdminClient()
 
   const { data: lesson, error } = await adminClient
     .from('lessons')

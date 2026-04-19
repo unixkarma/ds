@@ -4,6 +4,8 @@
 -- Run this in: Supabase Dashboard -> SQL Editor
 -- ============================================================
 
+-- Note: default was raised from 0 to 15 by migration 021.
+-- Fresh installs use the 021 default; this file is kept as-is for history.
 ALTER TABLE instructors
   ADD COLUMN IF NOT EXISTS buffer_minutes INTEGER NOT NULL DEFAULT 0
     CHECK (buffer_minutes >= 0 AND buffer_minutes <= 60);

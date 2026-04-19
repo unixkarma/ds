@@ -61,6 +61,12 @@ const registrationSchema = z.object({
   dobMonth: z.string().min(1, 'Month is required'),
   dobDay: z.string().min(1, 'Day is required'),
   dobYear: z.string().min(1, 'Year is required'),
+  parent1Name: z.string().min(1, 'Required'),
+  parent1Phone: z.string().min(1, 'Required'),
+  parent1Email: z.string(),
+  parent2Name: z.string(),
+  parent2Phone: z.string(),
+  parent2Email: z.string(),
   emergencyContactName: z.string().min(1, 'Required'),
   emergencyContactPhone: z.string().min(1, 'Required'),
   emergencyContactRelationship: z.string().min(1, 'Required'),
@@ -73,10 +79,25 @@ const registrationSchema = z.object({
   permitNumber: z.string(),
   permitIssuedDate: z.string(),
   permitExpirationDate: z.string(),
-}).refine(data => data.password === data.confirmPassword, {
-  message: 'Passwords do not match',
-  path: ['confirmPassword'],
 })
+  .refine(data => data.password === data.confirmPassword, {
+    message: 'Passwords do not match',
+    path: ['confirmPassword'],
+  })
+  .refine(
+    data => {
+      if (!data.parent1Email) return true
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.parent1Email)
+    },
+    { message: 'Invalid email address', path: ['parent1Email'] },
+  )
+  .refine(
+    data => {
+      if (!data.parent2Email) return true
+      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.parent2Email)
+    },
+    { message: 'Invalid email address', path: ['parent2Email'] },
+  )
 
 type FormValues = z.infer<typeof registrationSchema>
 
@@ -111,6 +132,12 @@ export function StudentRegistrationForm({ registrationCode, schoolName }: Studen
       dobMonth: '',
       dobDay: '',
       dobYear: '',
+      parent1Name: '',
+      parent1Phone: '',
+      parent1Email: '',
+      parent2Name: '',
+      parent2Phone: '',
+      parent2Email: '',
       emergencyContactName: '',
       emergencyContactPhone: '',
       emergencyContactRelationship: '',
@@ -153,6 +180,12 @@ export function StudentRegistrationForm({ registrationCode, schoolName }: Studen
           zipCode: values.zipCode,
           gender: values.gender,
           dateOfBirth: dob,
+          parent1Name: values.parent1Name,
+          parent1Phone: values.parent1Phone,
+          parent1Email: values.parent1Email,
+          parent2Name: values.parent2Name,
+          parent2Phone: values.parent2Phone,
+          parent2Email: values.parent2Email,
           emergencyContactName: values.emergencyContactName,
           emergencyContactPhone: values.emergencyContactPhone,
           emergencyContactRelationship: values.emergencyContactRelationship,
@@ -408,10 +441,80 @@ export function StudentRegistrationForm({ registrationCode, schoolName }: Studen
           </CardContent>
         </Card>
 
+        {/* ── Parent / Guardian Information ───────────────── */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Parent / Guardian Information</CardTitle>
+            <CardDescription>
+              Parent / Guardian 1 is required. Parent / Guardian 2 is optional.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {/* Parent 1 */}
+            <div>
+              <p className="text-sm font-medium mb-3">Parent / Guardian 1 *</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <FormField control={form.control} name="parent1Name" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Name *</FormLabel>
+                    <FormControl><Input placeholder="Full name" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="parent1Phone" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone *</FormLabel>
+                    <FormControl><Input type="tel" placeholder="(555) 123-4567" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="parent1Email" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl><Input type="email" placeholder="Optional" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Parent 2 */}
+            <div>
+              <p className="text-sm font-medium mb-3">Parent / Guardian 2 (optional)</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <FormField control={form.control} name="parent2Name" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Full Name</FormLabel>
+                    <FormControl><Input placeholder="Full name" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="parent2Phone" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone</FormLabel>
+                    <FormControl><Input type="tel" placeholder="(555) 123-4567" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={form.control} name="parent2Email" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl><Input type="email" placeholder="Optional" {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* ── Emergency Contact ────────────────────────────── */}
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Emergency Contact</CardTitle>
+            <CardDescription>A non-parent contact in case of emergency.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

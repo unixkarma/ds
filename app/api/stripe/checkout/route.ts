@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
     .eq('id', user.id)
     .single()
 
-  if (!profile || (profile.role !== 'student' && profile.role !== 'parent')) {
+  if (!profile || profile.role !== 'student') {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

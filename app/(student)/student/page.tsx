@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import { CalendarDays, CheckCircle, Clock, BookOpen } from 'lucide-react'
 
 import { getStudentPortalData } from '@/lib/services/student-portal'
+import { getPermitPhotoSignedUrl } from '@/lib/services/permit-photo'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { PermitUpload } from '@/components/student/permit-upload'
@@ -22,6 +23,7 @@ export default async function StudentPortalPage() {
 
   const { student, upcomingLessons, recentLessons } = data
   const lessonsRemaining = student.lessons_remaining ?? 0
+  const permitPhotoUrl = await getPermitPhotoSignedUrl(student.permit_photo_url)
 
   return (
     <div className="space-y-8">
@@ -60,7 +62,7 @@ export default async function StudentPortalPage() {
       {/* Permit photo upload */}
       <PermitUpload
         studentId={student.id}
-        existingUrl={student.permit_photo_url || ''}
+        existingUrl={permitPhotoUrl ?? ''}
       />
 
       {/* Upcoming lessons */}

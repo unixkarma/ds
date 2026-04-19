@@ -21,14 +21,14 @@ export default async function InstructorLayout({ children }: { children: ReactNo
     .single()
 
   if (!profile || profile.role !== 'instructor') {
-    if (profile?.role === 'student' || profile?.role === 'parent') {
+    if (profile?.role === 'student') {
       redirect('/student')
     }
     redirect('/dashboard')
   }
 
   const { data: school } = await supabase
-    .from('schools')
+    .from('schools_public')
     .select('name')
     .eq('id', profile.school_id)
     .single()
