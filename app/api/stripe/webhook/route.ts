@@ -76,6 +76,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
     }
 
+    // Pull payment method details from Stripe so the revenue report can
+    // show "Visa •••• 4242" and admins can validate against the dashboard.
+    let paymentMethodType: string | null = null
+    let cardBrand: string | null = null
+    let cardLast4: string | null = null
+    if (completedSession.payment_intent) {
+      try {
+        const intent = await stripe.paymentIntents.retrieve(
+          completedSession.payment_intent,
+          { expand: ['payment_method'] },
+        )
+        const pm = intent.payment_method
+        if (pm && typeof pm !== 'string') {
+          paymentMethodType = pm.type
+          if (pm.card) {
+            cardBrand = pm.card.brand ?? null
+            cardLast4 = pm.card.last4 ?? null
+          }
+        }
+      } catch {
+        // Non-fatal: keep going with nulls so we still record the sale.
+      }
+    }
+
     // Record the payment
     await adminClient.from('payments').insert({
       school_id: schoolId,
@@ -84,6 +108,9 @@ export async function POST(request: NextRequest) {
       stripe_payment_intent_id: completedSession.payment_intent ?? '',
       amount_cents: amountCents,
       status: 'completed',
+      payment_method: paymentMethodType,
+      card_brand: cardBrand,
+      card_last4: cardLast4,
     })
 
     // Credit lessons to the student

@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { estimateTravelMinutes } from '@/lib/travel-time'
 
 const updateLessonSchema = z.object({
   status: z.enum(['cancelled', 'completed', 'no_show']).optional(),
@@ -49,7 +50,7 @@ export async function PATCH(
   // Verify the lesson belongs to this school
   const { data: existing } = await supabase
     .from('lessons')
-    .select('id, status, instructor_id, student_id, duration_minutes, school_id, sold_by, price_cents')
+    .select('id, status, instructor_id, student_id, duration_minutes, school_id, sold_by, price_cents, pickup_location, dropoff_location')
     .eq('id', id)
     .eq('school_id', profile.school_id)
     .single()
@@ -63,6 +64,8 @@ export async function PATCH(
     const newStart = new Date(updates.scheduledAt)
     const newDuration = updates.durationMinutes ?? existing.duration_minutes
     const newEnd = new Date(newStart.getTime() + newDuration * 60 * 1000)
+    const newPickup = updates.pickupLocation ?? existing.pickup_location
+    const newDropoff = updates.dropoffLocation ?? existing.dropoff_location
 
     const dayStart = new Date(newStart)
     dayStart.setHours(0, 0, 0, 0)
@@ -71,7 +74,7 @@ export async function PATCH(
 
     const { data: conflicts } = await supabase
       .from('lessons')
-      .select('id, scheduled_at, duration_minutes, instructor_id, student_id')
+      .select('id, scheduled_at, duration_minutes, instructor_id, student_id, pickup_location, dropoff_location')
       .eq('school_id', profile.school_id)
       .eq('status', 'scheduled')
       .neq('id', id) // exclude the current lesson
@@ -96,6 +99,58 @@ export async function PATCH(
             { status: 409 }
           )
         }
+      }
+    }
+
+    // Travel time check (ZIP-prefix heuristic) for back-to-back lessons
+    const { data: instructorRecord } = await supabase
+      .from('instructors')
+      .select('buffer_minutes')
+      .eq('id', existing.instructor_id)
+      .single()
+    const bufferMinutes = instructorRecord?.buffer_minutes ?? 0
+
+    const sameInstructorToday = (conflicts ?? [])
+      .filter(ex => ex.instructor_id === existing.instructor_id)
+      .map(ex => {
+        const exStart = new Date(ex.scheduled_at).getTime()
+        const exEnd = exStart + ex.duration_minutes * 60 * 1000
+        return { ...ex, exStart, exEnd }
+      })
+
+    const prevLesson = sameInstructorToday
+      .filter(ex => ex.exEnd <= newStart.getTime())
+      .sort((a, b) => b.exEnd - a.exEnd)[0]
+
+    const nextLesson = sameInstructorToday
+      .filter(ex => ex.exStart >= newEnd.getTime())
+      .sort((a, b) => a.exStart - b.exStart)[0]
+
+    if (prevLesson) {
+      const gapMin = Math.round((newStart.getTime() - prevLesson.exEnd) / 60000)
+      const travelEst = estimateTravelMinutes(prevLesson.dropoff_location, newPickup)
+      const required = Math.max(travelEst ?? 0, bufferMinutes)
+      if (required > 0 && gapMin < required) {
+        return NextResponse.json(
+          {
+            error: `Not enough time after the previous lesson. Need ~${required} min for travel/buffer, only ${gapMin} min available.`,
+          },
+          { status: 409 }
+        )
+      }
+    }
+
+    if (nextLesson) {
+      const gapMin = Math.round((nextLesson.exStart - newEnd.getTime()) / 60000)
+      const travelEst = estimateTravelMinutes(newDropoff, nextLesson.pickup_location)
+      const required = Math.max(travelEst ?? 0, bufferMinutes)
+      if (required > 0 && gapMin < required) {
+        return NextResponse.json(
+          {
+            error: `Not enough time before the next lesson. Need ~${required} min for travel/buffer, only ${gapMin} min available.`,
+          },
+          { status: 409 }
+        )
       }
     }
   }

@@ -32,7 +32,6 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { PlacesAutocomplete } from '@/components/ui/places-autocomplete'
 import type { StudentWithUser, InstructorWithUser, Vehicle } from '@/types'
 
 // All fields z.string() — avoid react-hook-form resolver type conflicts
@@ -288,10 +287,9 @@ export function BookLessonDialog({
                   <FormItem>
                     <FormLabel>Pickup Location</FormLabel>
                     <FormControl>
-                      <PlacesAutocomplete
-                        value={field.value}
-                        onChange={field.onChange}
-                        placeholder="Search pickup address..."
+                      <Input
+                        placeholder="Street address + ZIP"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />
@@ -305,10 +303,9 @@ export function BookLessonDialog({
                   <FormItem>
                     <FormLabel>Dropoff Location</FormLabel>
                     <FormControl>
-                      <PlacesAutocomplete
-                        value={field.value}
-                        onChange={field.onChange}
-                        placeholder="Search dropoff address..."
+                      <Input
+                        placeholder="Street address + ZIP"
+                        {...field}
                       />
                     </FormControl>
                     <FormMessage />

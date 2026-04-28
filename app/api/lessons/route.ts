@@ -5,6 +5,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { estimateTravelMinutes } from '@/lib/travel-time'
 
 // ── GET ───────────────────────────────────────────────────────
 export async function GET(request: NextRequest) {
@@ -101,10 +102,10 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Fetch instructor for pricing
+  // Fetch instructor for pricing + buffer
   const { data: instructorRecord } = await supabase
     .from('instructors')
-    .select('modality, hourly_rate_cents, lesson_price_cents, commission_rate')
+    .select('modality, hourly_rate_cents, lesson_price_cents, commission_rate, buffer_minutes')
     .eq('id', instructorId)
     .single()
 
@@ -153,7 +154,7 @@ export async function POST(request: NextRequest) {
 
   const { data: existingLessons } = await supabase
     .from('lessons')
-    .select('id, scheduled_at, duration_minutes, instructor_id, student_id')
+    .select('id, scheduled_at, duration_minutes, instructor_id, student_id, pickup_location, dropoff_location')
     .eq('school_id', schoolId)
     .eq('status', 'scheduled')
     .gte('scheduled_at', dayStart.toISOString())
@@ -179,6 +180,56 @@ export async function POST(request: NextRequest) {
           { status: 409 }
         )
       }
+    }
+  }
+
+  // ── Travel time check (ZIP-prefix heuristic) ────────────────
+  // Find the closest prev/next lesson for THIS instructor on the same day.
+  // Required gap = max(zip-heuristic, instructor.buffer_minutes).
+  // If a ZIP can't be extracted, fall back to buffer_minutes alone.
+  const bufferMinutes = instructorRecord?.buffer_minutes ?? 0
+
+  const sameInstructorToday = (existingLessons ?? [])
+    .filter(ex => ex.instructor_id === instructorId)
+    .map(ex => {
+      const exStart = new Date(ex.scheduled_at).getTime()
+      const exEnd = exStart + ex.duration_minutes * 60 * 1000
+      return { ...ex, exStart, exEnd }
+    })
+
+  const prevLesson = sameInstructorToday
+    .filter(ex => ex.exEnd <= lessonStart.getTime())
+    .sort((a, b) => b.exEnd - a.exEnd)[0]
+
+  const nextLesson = sameInstructorToday
+    .filter(ex => ex.exStart >= lessonEnd.getTime())
+    .sort((a, b) => a.exStart - b.exStart)[0]
+
+  if (prevLesson) {
+    const gapMin = Math.round((lessonStart.getTime() - prevLesson.exEnd) / 60000)
+    const travelEst = estimateTravelMinutes(prevLesson.dropoff_location, pickupLocation)
+    const required = Math.max(travelEst ?? 0, bufferMinutes)
+    if (required > 0 && gapMin < required) {
+      return NextResponse.json(
+        {
+          error: `Not enough time after the previous lesson. Need ~${required} min for travel/buffer, only ${gapMin} min available.`,
+        },
+        { status: 409 }
+      )
+    }
+  }
+
+  if (nextLesson) {
+    const gapMin = Math.round((nextLesson.exStart - lessonEnd.getTime()) / 60000)
+    const travelEst = estimateTravelMinutes(dropoffLocation, nextLesson.pickup_location)
+    const required = Math.max(travelEst ?? 0, bufferMinutes)
+    if (required > 0 && gapMin < required) {
+      return NextResponse.json(
+        {
+          error: `Not enough time before the next lesson. Need ~${required} min for travel/buffer, only ${gapMin} min available.`,
+        },
+        { status: 409 }
+      )
     }
   }
 
