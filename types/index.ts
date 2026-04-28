@@ -178,6 +178,9 @@ export interface Payment {
   stripe_payment_intent_id: string
   amount_cents: number
   status: PaymentStatus
+  payment_method: string | null
+  card_brand: string | null
+  card_last4: string | null
   created_at: string
 }
 
