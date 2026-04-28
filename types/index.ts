@@ -159,6 +159,7 @@ export interface Lesson {
   instructor_earning_cents: number
   cancelled_by: LessonCancelledBy | null
   cancellation_fee_cents: number
+  opening_id: string | null
   created_at: string
 }
 
@@ -247,4 +248,36 @@ export interface DashboardStats {
   lessonsTodayCount: number
   revenueThisMonthCents: number
   upcomingLessons: LessonWithRelations[]
+}
+
+// ── Openings & Templates (Step 13) ───────────────────────────
+export type OpeningStatus = 'available' | 'booked' | 'blocked'
+
+export interface OpeningTemplateSlot {
+  start: string         // "HH:MM" 24h
+  duration_min: number  // minutes
+}
+
+export interface OpeningTemplate {
+  id: string
+  school_id: string
+  instructor_id: string | null  // NULL = school-wide default
+  name: string
+  slots: OpeningTemplateSlot[]
+  created_at: string
+}
+
+export interface Opening {
+  id: string
+  school_id: string
+  instructor_id: string
+  template_id: string | null
+  scheduled_at: string
+  duration_minutes: number
+  status: OpeningStatus
+  created_at: string
+}
+
+export interface OpeningWithInstructor extends Opening {
+  instructor: InstructorWithUser
 }
