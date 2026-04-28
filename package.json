@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "TZ=America/Chicago next dev",
+    "build": "TZ=America/Chicago next build",
+    "start": "TZ=America/Chicago next start",
     "lint": "eslint"
   },
   "dependencies": {
