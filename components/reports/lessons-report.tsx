@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { parseISO, startOfDay, endOfDay } from 'date-fns'
-import { Calendar, CheckCircle2, XCircle, AlertCircle } from 'lucide-react'
+import { parseISO, startOfDay, endOfDay, format } from 'date-fns'
+import { Calendar, CheckCircle2, XCircle, AlertCircle, Download } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -21,6 +22,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { formatDateTime, getFullName } from '@/lib/utils'
+import { toCSV, downloadCSV, type CSVColumn } from '@/lib/csv'
 import type { LessonWithRelations, InstructorWithUser, LessonStatus } from '@/types'
 
 const STATUS_BADGE: Record<LessonStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -63,59 +65,88 @@ export function LessonsReport({ lessons, instructors }: LessonsReportProps) {
   const cancelledCount = filtered.filter(l => l.status === 'cancelled').length
   const noShowCount = filtered.filter(l => l.status === 'no_show').length
 
+  const handleExport = () => {
+    const columns: CSVColumn<LessonWithRelations>[] = [
+      { header: 'Date', value: l => format(parseISO(l.scheduled_at), 'yyyy-MM-dd HH:mm') },
+      { header: 'Student', value: l => getFullName(l.student.user) },
+      { header: 'Instructor', value: l => getFullName(l.instructor.user) },
+      { header: 'Vehicle', value: l => l.vehicle ? `${l.vehicle.year} ${l.vehicle.make} ${l.vehicle.model}` : '' },
+      { header: 'Duration (min)', value: l => l.duration_minutes },
+      { header: 'Status', value: l => STATUS_LABEL[l.status] },
+      { header: 'Sold By', value: l => l.sold_by ?? '' },
+      { header: 'Price', value: l => (l.price_cents / 100).toFixed(2) },
+      { header: 'Instructor Earning', value: l => (l.instructor_earning_cents / 100).toFixed(2) },
+    ]
+    const csv = toCSV(filtered, columns)
+    const today = format(new Date(), 'yyyy-MM-dd')
+    downloadCSV(`lessons-${today}.csv`, csv)
+  }
+
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground font-medium">From</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={e => setStartDate(e.target.value)}
-            className="h-9 px-3 rounded-md border border-input bg-background text-sm"
-          />
+      <div className="flex flex-wrap gap-3 items-end justify-between">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">From</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              className="h-9 px-3 rounded-md border border-input bg-background text-sm"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">To</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+              className="h-9 px-3 rounded-md border border-input bg-background text-sm"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">Instructor</label>
+            <Select value={instructorId} onValueChange={setInstructorId}>
+              <SelectTrigger className="w-44">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Instructors</SelectItem>
+                {instructors.map(i => (
+                  <SelectItem key={i.id} value={i.id}>
+                    {getFullName(i.user)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">Status</label>
+            <Select value={status} onValueChange={setStatus}>
+              <SelectTrigger className="w-36">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="scheduled">Scheduled</SelectItem>
+                <SelectItem value="completed">Completed</SelectItem>
+                <SelectItem value="cancelled">Cancelled</SelectItem>
+                <SelectItem value="no_show">No Show</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground font-medium">To</label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={e => setEndDate(e.target.value)}
-            className="h-9 px-3 rounded-md border border-input bg-background text-sm"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground font-medium">Instructor</label>
-          <Select value={instructorId} onValueChange={setInstructorId}>
-            <SelectTrigger className="w-44">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Instructors</SelectItem>
-              {instructors.map(i => (
-                <SelectItem key={i.id} value={i.id}>
-                  {getFullName(i.user)}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground font-medium">Status</label>
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger className="w-36">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Statuses</SelectItem>
-              <SelectItem value="scheduled">Scheduled</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
-              <SelectItem value="no_show">No Show</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExport}
+          disabled={filtered.length === 0}
+          className="gap-2"
+        >
+          <Download className="h-4 w-4" />
+          Export CSV
+        </Button>
       </div>
 
       {/* Summary */}

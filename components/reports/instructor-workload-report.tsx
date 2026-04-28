@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { parseISO, startOfDay, endOfDay } from 'date-fns'
-import { UserCheck, BookOpen } from 'lucide-react'
+import { parseISO, startOfDay, endOfDay, format } from 'date-fns'
+import { UserCheck, BookOpen, Download } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Table,
   TableBody,
@@ -14,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { getFullName } from '@/lib/utils'
+import { toCSV, downloadCSV, type CSVColumn } from '@/lib/csv'
 import type { InstructorWithUser, LessonWithRelations } from '@/types'
 
 interface InstructorWorkloadReportProps {
@@ -52,28 +54,56 @@ export function InstructorWorkloadReport({ instructors, lessons }: InstructorWor
 
   const totalLessons = workload.reduce((sum, w) => sum + w.total, 0)
 
+  const handleExport = () => {
+    type Row = (typeof workload)[number]
+    const columns: CSVColumn<Row>[] = [
+      { header: 'Instructor', value: r => getFullName(r.instructor.user) },
+      { header: 'Status', value: r => r.instructor.is_active ? 'Active' : 'Inactive' },
+      { header: 'Total', value: r => r.total },
+      { header: 'Completed', value: r => r.completed },
+      { header: 'Scheduled', value: r => r.scheduled },
+      { header: 'Cancelled', value: r => r.cancelled },
+      { header: 'No Show', value: r => r.no_show },
+    ]
+    const csv = toCSV(workload, columns)
+    const today = format(new Date(), 'yyyy-MM-dd')
+    downloadCSV(`workload-${today}.csv`, csv)
+  }
+
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground font-medium">From</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={e => setStartDate(e.target.value)}
-            className="h-9 px-3 rounded-md border border-input bg-background text-sm"
-          />
+      <div className="flex flex-wrap gap-3 items-end justify-between">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">From</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              className="h-9 px-3 rounded-md border border-input bg-background text-sm"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">To</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+              className="h-9 px-3 rounded-md border border-input bg-background text-sm"
+            />
+          </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground font-medium">To</label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={e => setEndDate(e.target.value)}
-            className="h-9 px-3 rounded-md border border-input bg-background text-sm"
-          />
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExport}
+          disabled={workload.length === 0}
+          className="gap-2"
+        >
+          <Download className="h-4 w-4" />
+          Export CSV
+        </Button>
       </div>
 
       {/* Summary */}

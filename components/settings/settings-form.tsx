@@ -12,7 +12,24 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import type { School } from '@/types'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import type { School, SchoolTimezone } from '@/types'
+
+const TIMEZONE_OPTIONS: { value: SchoolTimezone; label: string }[] = [
+  { value: 'America/New_York', label: 'Eastern Time (ET)' },
+  { value: 'America/Chicago', label: 'Central Time (CT)' },
+  { value: 'America/Denver', label: 'Mountain Time (MT)' },
+  { value: 'America/Los_Angeles', label: 'Pacific Time (PT)' },
+  { value: 'America/Anchorage', label: 'Alaska Time (AKT)' },
+  { value: 'America/Phoenix', label: 'Arizona (no DST)' },
+  { value: 'Pacific/Honolulu', label: 'Hawaii Time (HT)' },
+]
 
 // ── Schemas ───────────────────────────────────────────────────
 
@@ -21,6 +38,15 @@ const schoolSchema = z.object({
   email: z.string().email('Valid email required'),
   phone: z.string(),
   address: z.string(),
+  timezone: z.enum([
+    'America/New_York',
+    'America/Chicago',
+    'America/Denver',
+    'America/Los_Angeles',
+    'America/Anchorage',
+    'America/Phoenix',
+    'Pacific/Honolulu',
+  ]),
 })
 
 const stripeSchema = z.object({
@@ -50,6 +76,7 @@ function SchoolInfoForm({ school }: { school: School }) {
       email: school.email,
       phone: school.phone,
       address: school.address,
+      timezone: school.timezone,
     },
   })
 
@@ -112,6 +139,28 @@ function SchoolInfoForm({ school }: { school: School }) {
         <div className="space-y-1.5">
           <Label htmlFor="address">Address</Label>
           <Input id="address" {...form.register('address')} />
+        </div>
+
+        <div className="space-y-1.5">
+          <Label htmlFor="timezone">Timezone</Label>
+          <Select
+            value={form.watch('timezone')}
+            onValueChange={(v) => form.setValue('timezone', v as SchoolTimezone, { shouldDirty: true })}
+          >
+            <SelectTrigger id="timezone">
+              <SelectValue placeholder="Select timezone" />
+            </SelectTrigger>
+            <SelectContent>
+              {TIMEZONE_OPTIONS.map((tz) => (
+                <SelectItem key={tz.value} value={tz.value}>
+                  {tz.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            All lesson dates, calendars, and reports will be anchored to this timezone.
+          </p>
         </div>
       </div>
 
