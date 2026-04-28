@@ -46,6 +46,14 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
   const lessonEnd = new Date(lessonStart.getTime() + lesson.duration_minutes * 60 * 1000)
   const isScheduled = lesson.status === 'scheduled'
 
+  function openReschedule() {
+    // Pre-fill with the lesson's current date/time so the user can tweak instead of filling blank
+    setRescheduleDate(format(lessonStart, 'yyyy-MM-dd'))
+    setRescheduleTime(format(lessonStart, 'HH:mm'))
+    setShowReschedule(true)
+    setError(null)
+  }
+
   async function handleCancel() {
     setIsCancelling(true)
     setError(null)
@@ -290,10 +298,7 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
             <Button
               variant="outline"
               size="sm"
-              onClick={() => {
-                setShowReschedule(true)
-                setError(null)
-              }}
+              onClick={openReschedule}
             >
               Reschedule
             </Button>

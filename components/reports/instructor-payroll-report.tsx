@@ -2,9 +2,10 @@
 
 import { useState, useMemo } from 'react'
 import { parseISO, startOfMonth, endOfMonth, format } from 'date-fns'
-import { DollarSign, Users, Receipt } from 'lucide-react'
+import { DollarSign, Users, Receipt, Download } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Table,
   TableBody,
@@ -14,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { getFullName } from '@/lib/utils'
+import { toCSV, downloadCSV, type CSVColumn } from '@/lib/csv'
 import type { InstructorWithUser, LessonWithRelations } from '@/types'
 
 function dollars(cents: number): string {
@@ -119,10 +121,27 @@ export function InstructorPayrollReport({ instructors, lessons }: InstructorPayr
       .reduce((sum, l) => sum + (l.price_cents - l.instructor_earning_cents), 0)
   }, [filteredLessons])
 
+  const handleExport = () => {
+    type Row = (typeof payroll)[number]
+    const columns: CSVColumn<Row>[] = [
+      { header: 'Instructor', value: r => getFullName(r.instructor.user) },
+      { header: 'Modality', value: r => r.instructor.modality },
+      { header: 'Lessons', value: r => r.completedCount },
+      { header: 'Hours', value: r => r.totalHours.toFixed(2) },
+      { header: 'Gross', value: r => (r.grossEarnings / 100).toFixed(2) },
+      { header: 'Commission', value: r => (r.commissionCollected / 100).toFixed(2) },
+      { header: 'Vehicle Deduction', value: r => (r.vehicleDeduction / 100).toFixed(2) },
+      { header: 'Cancel Fees', value: r => (r.cancelFees / 100).toFixed(2) },
+      { header: 'Net Payable', value: r => (r.netPayable / 100).toFixed(2) },
+    ]
+    const csv = toCSV(payroll, columns)
+    downloadCSV(`payroll-${month}.csv`, csv)
+  }
+
   return (
     <div className="space-y-6">
       {/* Period selector */}
-      <div className="flex flex-wrap gap-3 items-end">
+      <div className="flex flex-wrap gap-3 items-end justify-between">
         <div className="flex flex-col gap-1">
           <label className="text-xs text-muted-foreground font-medium">Month</label>
           <input
@@ -132,6 +151,16 @@ export function InstructorPayrollReport({ instructors, lessons }: InstructorPayr
             className="h-9 px-3 rounded-md border border-input bg-background text-sm"
           />
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExport}
+          disabled={payroll.length === 0}
+          className="gap-2"
+        >
+          <Download className="h-4 w-4" />
+          Export CSV
+        </Button>
       </div>
 
       {/* Summary cards */}

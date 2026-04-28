@@ -12,6 +12,15 @@ export type LessonStatus = 'scheduled' | 'completed' | 'cancelled' | 'no_show'
 export type PaymentStatus = 'pending' | 'completed' | 'refunded' | 'failed'
 
 // ── Schools ──────────────────────────────────────────────────
+export type SchoolTimezone =
+  | 'America/New_York'
+  | 'America/Chicago'
+  | 'America/Denver'
+  | 'America/Los_Angeles'
+  | 'America/Anchorage'
+  | 'America/Phoenix'
+  | 'Pacific/Honolulu'
+
 export interface School {
   id: string
   name: string
@@ -19,6 +28,7 @@ export interface School {
   phone: string
   address: string
   registration_code: string
+  timezone: SchoolTimezone
   stripe_publishable_key: string | null
   stripe_secret_key: string | null
   stripe_webhook_secret: string | null

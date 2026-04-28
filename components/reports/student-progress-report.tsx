@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Users, BookOpen, CheckSquare } from 'lucide-react'
+import { format } from 'date-fns'
+import { Users, BookOpen, CheckSquare, Download } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -20,6 +22,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { formatDate, getFullName } from '@/lib/utils'
+import { toCSV, downloadCSV, type CSVColumn } from '@/lib/csv'
 import type { StudentWithUser, StudentStatus } from '@/types'
 
 const STATUS_BADGE: Record<StudentStatus, 'default' | 'secondary' | 'outline'> = {
@@ -45,10 +48,31 @@ export function StudentProgressReport({ students }: StudentProgressReportProps) 
     ? Math.round(filtered.reduce((sum, s) => sum + s.total_lessons_completed, 0) / filtered.length)
     : 0
 
+  const handleExport = () => {
+    const columns: CSVColumn<StudentWithUser>[] = [
+      { header: 'Student', value: s => getFullName(s.user) },
+      { header: 'Email', value: s => s.user.email ?? '' },
+      { header: 'Status', value: s => s.status },
+      { header: 'Enrolled', value: s => formatDate(s.enrollment_date) },
+      { header: 'Purchased', value: s => s.total_lessons_purchased },
+      { header: 'Completed', value: s => s.total_lessons_completed },
+      { header: 'Remaining', value: s => s.lessons_remaining },
+      {
+        header: 'Progress %',
+        value: s => s.total_lessons_purchased > 0
+          ? Math.round((s.total_lessons_completed / s.total_lessons_purchased) * 100)
+          : 0,
+      },
+    ]
+    const csv = toCSV(filtered, columns)
+    const today = format(new Date(), 'yyyy-MM-dd')
+    downloadCSV(`students-${today}.csv`, csv)
+  }
+
   return (
     <div className="space-y-6">
       {/* Filter */}
-      <div className="flex flex-wrap gap-3 items-end">
+      <div className="flex flex-wrap gap-3 items-end justify-between">
         <div className="flex flex-col gap-1">
           <label className="text-xs text-muted-foreground font-medium">Status</label>
           <Select value={status} onValueChange={setStatus}>
@@ -63,6 +87,16 @@ export function StudentProgressReport({ students }: StudentProgressReportProps) 
             </SelectContent>
           </Select>
         </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExport}
+          disabled={filtered.length === 0}
+          className="gap-2"
+        >
+          <Download className="h-4 w-4" />
+          Export CSV
+        </Button>
       </div>
 
       {/* Summary */}

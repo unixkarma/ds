@@ -5,11 +5,22 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
+const TIMEZONE_VALUES = [
+  'America/New_York',
+  'America/Chicago',
+  'America/Denver',
+  'America/Los_Angeles',
+  'America/Anchorage',
+  'America/Phoenix',
+  'Pacific/Honolulu',
+] as const
+
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
   email: z.string().email().optional(),
   phone: z.string().optional(),
   address: z.string().optional(),
+  timezone: z.enum(TIMEZONE_VALUES).optional(),
   stripe_publishable_key: z.string().nullable().optional(),
   stripe_secret_key: z.string().nullable().optional(),
   stripe_webhook_secret: z.string().nullable().optional(),
@@ -50,6 +61,7 @@ export async function PATCH(request: NextRequest) {
   if (d.email !== undefined) update.email = d.email
   if (d.phone !== undefined) update.phone = d.phone
   if (d.address !== undefined) update.address = d.address
+  if (d.timezone !== undefined) update.timezone = d.timezone
   if (d.stripe_publishable_key !== undefined) update.stripe_publishable_key = d.stripe_publishable_key
   if (d.stripe_secret_key !== undefined) update.stripe_secret_key = d.stripe_secret_key
   if (d.stripe_webhook_secret !== undefined) update.stripe_webhook_secret = d.stripe_webhook_secret
