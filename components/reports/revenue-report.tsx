@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { parseISO, startOfDay, endOfDay } from 'date-fns'
-import { DollarSign, CreditCard, TrendingUp, Package as PackageIcon, Copy, Check } from 'lucide-react'
+import { parseISO, startOfDay, endOfDay, format } from 'date-fns'
+import { DollarSign, CreditCard, TrendingUp, Package as PackageIcon, Copy, Check, Download } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { formatCurrency, formatDate, getFullName } from '@/lib/utils'
+import { toCSV, downloadCSV, type CSVColumn } from '@/lib/csv'
 import type { PaymentWithRelations, PaymentStatus } from '@/types'
 
 const STATUS_BADGE: Record<PaymentStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -127,28 +128,58 @@ export function RevenueReport({ payments }: RevenueReportProps) {
     return Array.from(map.values()).sort((a, b) => b.totalCents - a.totalCents)
   }, [completedPayments])
 
+  const handleExport = () => {
+    const columns: CSVColumn<PaymentWithRelations>[] = [
+      { header: 'Date', value: p => format(parseISO(p.created_at), 'yyyy-MM-dd HH:mm') },
+      { header: 'Student', value: p => getFullName(p.student.user) },
+      { header: 'Email', value: p => p.student.user.email ?? '' },
+      { header: 'Package', value: p => p.package?.name ?? 'Single Lesson' },
+      { header: 'Method', value: p => methodLabel(p.payment_method) },
+      { header: 'Card Brand', value: p => p.card_brand ?? '' },
+      { header: 'Card Last4', value: p => p.card_last4 ?? '' },
+      { header: 'Stripe Payment Intent', value: p => p.stripe_payment_intent_id },
+      { header: 'Amount', value: p => (p.amount_cents / 100).toFixed(2) },
+      { header: 'Status', value: p => p.status },
+    ]
+    const csv = toCSV(filtered, columns)
+    const today = format(new Date(), 'yyyy-MM-dd')
+    downloadCSV(`revenue-${today}.csv`, csv)
+  }
+
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="flex flex-wrap gap-3 items-end">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground font-medium">From</label>
-          <input
-            type="date"
-            value={startDate}
-            onChange={e => setStartDate(e.target.value)}
-            className="h-9 px-3 rounded-md border border-input bg-background text-sm"
-          />
+      <div className="flex flex-wrap gap-3 items-end justify-between">
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">From</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              className="h-9 px-3 rounded-md border border-input bg-background text-sm"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">To</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+              className="h-9 px-3 rounded-md border border-input bg-background text-sm"
+            />
+          </div>
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground font-medium">To</label>
-          <input
-            type="date"
-            value={endDate}
-            onChange={e => setEndDate(e.target.value)}
-            className="h-9 px-3 rounded-md border border-input bg-background text-sm"
-          />
-        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExport}
+          disabled={filtered.length === 0}
+          className="gap-2"
+        >
+          <Download className="h-4 w-4" />
+          Export CSV
+        </Button>
       </div>
 
       {/* Summary */}
