@@ -30,6 +30,7 @@ const navLinks = [
   { href: '/instructor/calendar', label: 'Calendar' },
   { href: '/instructor/schedule', label: 'Schedule' },
   { href: '/instructor/availability', label: 'Availability' },
+  { href: '/instructor/templates', label: 'Templates' },
   { href: '/instructor/earnings', label: 'Earnings' },
 ]
 
