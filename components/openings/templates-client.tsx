@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/alert-dialog'
 import { TemplateDialog } from '@/components/openings/template-dialog'
 import { GenerateOpeningsClient } from '@/components/openings/generate-openings-client'
-import { formatTime } from '@/lib/utils'
+import { formatTimeRange } from '@/lib/utils'
 import type { Opening, OpeningTemplate } from '@/types'
 
 interface TemplatesClientProps {
@@ -86,7 +86,7 @@ function TemplateCard({
         <div className="flex flex-wrap gap-1.5">
           {template.slots.map((slot, i) => (
             <Badge key={i} variant="outline" className="font-normal">
-              {formatTime(slot.start)} · {slot.duration_min} min
+              {formatTimeRange(slot.start, slot.duration_min)}
             </Badge>
           ))}
         </div>

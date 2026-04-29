@@ -46,3 +46,13 @@ export function formatTime(time: string): string {
   const hour = h % 12 === 0 ? 12 : h % 12
   return `${hour}:${String(m).padStart(2, '0')} ${period}`
 }
+
+// Format a time slot as "9:00 AM – 10:00 AM" given a start (HH:MM) and duration in minutes.
+export function formatTimeRange(start: string, durationMin: number): string {
+  const [h, m] = start.split(':').map(Number)
+  const totalEnd = h * 60 + m + durationMin
+  const endH = Math.floor(totalEnd / 60) % 24
+  const endM = totalEnd % 60
+  const endStr = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`
+  return `${formatTime(start)} – ${formatTime(endStr)}`
+}
