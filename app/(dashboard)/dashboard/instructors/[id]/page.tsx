@@ -4,12 +4,11 @@ import type { Metadata } from 'next'
 import { ChevronLeft, Mail, Phone, Hash, BookOpen, Pencil } from 'lucide-react'
 
 import { getInstructorById } from '@/lib/services/instructors'
-import { formatDateTime, formatTime, getFullName, DAY_LABELS } from '@/lib/utils'
+import { formatDateTime, getFullName } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
-import { AvailabilityForm } from '@/components/instructors/availability-form'
 import { InstructorStatusToggle } from '@/components/instructors/instructor-status-toggle'
 import { ResendInviteButton } from '@/components/instructors/resend-invite-button'
 import { DeleteInstructorButton } from '@/components/instructors/delete-instructor-button'
@@ -23,9 +22,6 @@ const lessonStatusConfig: Record<LessonStatus, { label: string; variant: 'defaul
   cancelled: { label: 'Cancelled', variant: 'destructive' },
   no_show: { label: 'No Show', variant: 'outline' },
 }
-
-// Days ordered Mon–Sun (same order as AvailabilityForm)
-const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]
 
 export default async function InstructorDetailPage({
   params,
@@ -99,43 +95,19 @@ export default async function InstructorDetailPage({
           </CardContent>
         </Card>
 
-        {/* Weekly availability (read-only summary) */}
+        {/* Schedule note */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">This Week&apos;s Hours</CardTitle>
+            <CardTitle className="text-base">Schedule</CardTitle>
           </CardHeader>
           <CardContent>
-            {instructor.availability.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No availability set.</p>
-            ) : (
-              <div className="space-y-1 text-sm">
-                {DAY_ORDER.map((day) => {
-                  const slot = instructor.availability.find((a) => a.day_of_week === day)
-                  if (!slot) return null
-                  return (
-                    <div key={day} className="flex justify-between">
-                      <span className="text-muted-foreground">{DAY_LABELS[day].slice(0, 3)}</span>
-                      <span>
-                        {formatTime(slot.start_time)} – {formatTime(slot.end_time)}
-                      </span>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+            <p className="text-sm text-muted-foreground">
+              Templates and days off are managed by the instructor in their portal.
+              The system auto-generates bookable openings for the next 14 days.
+            </p>
           </CardContent>
         </Card>
       </div>
-
-      {/* Availability editor */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Weekly Availability</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <AvailabilityForm instructorId={id} existing={instructor.availability} />
-        </CardContent>
-      </Card>
 
       {/* Upcoming lessons */}
       <Card>

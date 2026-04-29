@@ -7,6 +7,10 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import {
+  regenerateOpenings,
+  regenerateAllInstructorsInSchool,
+} from '@/lib/services/openings-generator'
 
 const slotSchema = z.object({
   start: z.string().regex(/^\d{2}:\d{2}$/, 'Format must be HH:MM'),
@@ -16,6 +20,7 @@ const slotSchema = z.object({
 const createSchema = z.object({
   name: z.string().min(1).max(60),
   slots: z.array(slotSchema).min(1, 'At least one slot is required'),
+  day_of_week: z.array(z.number().int().min(0).max(6)).min(1, 'Pick at least one day').max(7),
   // For admin only — null = school-level, uuid = specific instructor
   instructor_id: z.string().uuid().nullable().optional(),
 })
@@ -105,6 +110,7 @@ export async function POST(request: NextRequest) {
       instructor_id: instructorId,
       name: parsed.data.name,
       slots: parsed.data.slots,
+      day_of_week: parsed.data.day_of_week,
     })
     .select()
     .single()
@@ -117,6 +123,14 @@ export async function POST(request: NextRequest) {
       )
     }
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // Auto-regenerate the affected instructor(s)' openings.
+  if (instructorId) {
+    await regenerateOpenings({ instructorId, schoolId: profile.school_id })
+  } else {
+    // School-level template — applies to every instructor in the school.
+    await regenerateAllInstructorsInSchool(profile.school_id)
   }
 
   return NextResponse.json({ template: tpl }, { status: 201 })
