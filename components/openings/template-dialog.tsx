@@ -55,11 +55,21 @@ const DAY_SHORT_LABELS: Record<number, string> = { 0: 'Sun', 1: 'Mon', 2: 'Tue',
 interface TemplateDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
+  // template = the row being edited (PATCH). null/undefined = creating new.
   template?: OpeningTemplate | null
+  // prefillFrom = a starter to copy slots/days/name from (used when "Use this template"
+  // is clicked on a school default). Always creates a new instructor-scoped template.
+  prefillFrom?: OpeningTemplate | null
   onSaved: () => void
 }
 
-export function TemplateDialog({ open, onOpenChange, template, onSaved }: TemplateDialogProps) {
+export function TemplateDialog({
+  open,
+  onOpenChange,
+  template,
+  prefillFrom,
+  onSaved,
+}: TemplateDialogProps) {
   const isEdit = !!template
   const [error, setError] = useState<string | null>(null)
   const [days, setDays] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]))
@@ -79,15 +89,16 @@ export function TemplateDialog({ open, onOpenChange, template, onSaved }: Templa
   })
 
   useEffect(() => {
-    if (template) {
+    const source = template ?? prefillFrom
+    if (source) {
       form.reset({
-        name: template.name,
-        slots: template.slots.map(s => ({
+        name: template ? source.name : `My ${source.name}`,
+        slots: source.slots.map(s => ({
           start: s.start,
           duration_min: String(s.duration_min),
         })),
       })
-      setDays(new Set(template.day_of_week ?? [1, 2, 3, 4, 5]))
+      setDays(new Set(source.day_of_week ?? [1, 2, 3, 4, 5]))
     } else {
       form.reset({
         name: '',
@@ -96,7 +107,7 @@ export function TemplateDialog({ open, onOpenChange, template, onSaved }: Templa
       setDays(new Set([1, 2, 3, 4, 5]))
     }
     setError(null)
-  }, [template, form, open])
+  }, [template, prefillFrom, form, open])
 
   function toggleDay(d: number) {
     setDays(prev => {
@@ -152,9 +163,13 @@ export function TemplateDialog({ open, onOpenChange, template, onSaved }: Templa
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Edit Template' : 'New Template'}</DialogTitle>
+          <DialogTitle>
+            {isEdit ? 'Edit Template' : prefillFrom ? `Customize "${prefillFrom.name}"` : 'New Template'}
+          </DialogTitle>
           <DialogDescription>
-            Pick the days and slots. The system will auto-generate openings for the next 14 days.
+            {prefillFrom
+              ? 'Tweak the days, slots, or name to fit your week. Saving creates a new template under your control.'
+              : 'Pick the days and slots. The system will auto-generate openings for the next 14 days.'}
           </DialogDescription>
         </DialogHeader>
 

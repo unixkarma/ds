@@ -61,12 +61,15 @@ export async function regenerateOpenings({
     .lt('scheduled_at', horizon.toISOString())
     .select('id')
 
-  // 2. Templates for this instructor: own + school defaults
+  // 2. Templates that auto-apply for this instructor.
+  // School defaults (instructor_id IS NULL) are starters/inspiration only — they do NOT
+  // auto-apply. Instructors must "use as starter" to clone them into instructor-scoped
+  // templates, which then auto-apply.
   const { data: templates } = await admin
     .from('opening_templates')
     .select('*')
     .eq('school_id', schoolId)
-    .or(`instructor_id.is.null,instructor_id.eq.${instructorId}`)
+    .eq('instructor_id', instructorId)
 
   const tpls = (templates ?? []) as OpeningTemplate[]
 
