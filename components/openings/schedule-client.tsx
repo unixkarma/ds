@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Pencil, Trash2, Plus, Lock, Sun, Sunset, CalendarRange, Calendar,
-  Loader2, X,
+  Loader2, X, Copy,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -85,11 +85,13 @@ function TemplateCard({
   readOnly,
   onEdit,
   onDelete,
+  onUseAsStarter,
 }: {
   template: OpeningTemplate
   readOnly: boolean
   onEdit?: () => void
   onDelete?: () => void
+  onUseAsStarter?: () => void
 }) {
   return (
     <Card>
@@ -102,7 +104,7 @@ function TemplateCard({
           {readOnly ? (
             <Badge variant="secondary" className="shrink-0 text-xs">
               <Lock className="h-3 w-3 mr-1" />
-              School default
+              Starter
             </Badge>
           ) : (
             <div className="flex gap-1 shrink-0">
@@ -126,7 +128,7 @@ function TemplateCard({
           <span>{template.slots.length} {template.slots.length === 1 ? 'slot' : 'slots'} per day</span>
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-3">
         <div className="flex flex-wrap gap-1.5">
           {template.slots.map((slot, i) => (
             <Badge key={i} variant="outline" className="font-normal">
@@ -134,6 +136,12 @@ function TemplateCard({
             </Badge>
           ))}
         </div>
+        {readOnly && onUseAsStarter && (
+          <Button variant="outline" size="sm" className="w-full" onClick={onUseAsStarter}>
+            <Copy className="mr-1.5 h-3.5 w-3.5" />
+            Use this template
+          </Button>
+        )}
       </CardContent>
     </Card>
   )
@@ -162,6 +170,7 @@ export function ScheduleClient({
   // Templates dialog state
   const [tplDialogOpen, setTplDialogOpen] = useState(false)
   const [editingTpl, setEditingTpl] = useState<OpeningTemplate | null>(null)
+  const [prefillTpl, setPrefillTpl] = useState<OpeningTemplate | null>(null)
   const [deletingTpl, setDeletingTpl] = useState<OpeningTemplate | null>(null)
   const [isDeletingTpl, setIsDeletingTpl] = useState(false)
 
@@ -180,11 +189,19 @@ export function ScheduleClient({
 
   function handleNewTpl() {
     setEditingTpl(null)
+    setPrefillTpl(null)
     setTplDialogOpen(true)
   }
 
   function handleEditTpl(t: OpeningTemplate) {
     setEditingTpl(t)
+    setPrefillTpl(null)
+    setTplDialogOpen(true)
+  }
+
+  function handleUseStarter(t: OpeningTemplate) {
+    setEditingTpl(null)
+    setPrefillTpl(t)
     setTplDialogOpen(true)
   }
 
@@ -323,12 +340,23 @@ export function ScheduleClient({
 
           {schoolDefaults.length > 0 && (
             <section className="space-y-3">
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                School defaults
-              </h2>
+              <div>
+                <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                  Starters
+                </h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Recipes from your school. They don&apos;t apply automatically — click{' '}
+                  <span className="font-medium">Use this template</span> to copy one as your own.
+                </p>
+              </div>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                 {schoolDefaults.map(t => (
-                  <TemplateCard key={t.id} template={t} readOnly />
+                  <TemplateCard
+                    key={t.id}
+                    template={t}
+                    readOnly
+                    onUseAsStarter={() => handleUseStarter(t)}
+                  />
                 ))}
               </div>
             </section>
@@ -576,6 +604,7 @@ export function ScheduleClient({
         open={tplDialogOpen}
         onOpenChange={setTplDialogOpen}
         template={editingTpl}
+        prefillFrom={prefillTpl}
         onSaved={() => router.refresh()}
       />
 

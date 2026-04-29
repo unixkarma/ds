@@ -8,10 +8,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import {
-  regenerateOpenings,
-  regenerateAllInstructorsInSchool,
-} from '@/lib/services/openings-generator'
+import { regenerateOpenings } from '@/lib/services/openings-generator'
 
 const slotSchema = z.object({
   start: z.string().regex(/^\d{2}:\d{2}$/, 'Format must be HH:MM'),
@@ -28,10 +25,10 @@ async function regenerateForTemplate(
   schoolId: string,
   templateInstructorId: string | null
 ) {
+  // School-level templates (instructor_id IS NULL) are starters/inspiration only —
+  // they don't auto-apply, so no regeneration needed.
   if (templateInstructorId) {
     await regenerateOpenings({ instructorId: templateInstructorId, schoolId })
-  } else {
-    await regenerateAllInstructorsInSchool(schoolId)
   }
 }
 
