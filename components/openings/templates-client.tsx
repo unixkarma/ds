@@ -7,6 +7,7 @@ import { Pencil, Trash2, Plus, Lock, Sun, Sunset, CalendarRange, Calendar } from
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,12 +19,15 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { TemplateDialog } from '@/components/openings/template-dialog'
+import { GenerateOpeningsClient } from '@/components/openings/generate-openings-client'
 import { formatTime } from '@/lib/utils'
-import type { OpeningTemplate } from '@/types'
+import type { Opening, OpeningTemplate } from '@/types'
 
 interface TemplatesClientProps {
+  instructorId: string
   schoolDefaults: OpeningTemplate[]
   ownTemplates: OpeningTemplate[]
+  upcomingOpenings: Opening[]
 }
 
 function templateIcon(name: string) {
@@ -91,7 +95,12 @@ function TemplateCard({
   )
 }
 
-export function TemplatesClient({ schoolDefaults, ownTemplates }: TemplatesClientProps) {
+export function TemplatesClient({
+  instructorId,
+  schoolDefaults,
+  ownTemplates,
+  upcomingOpenings,
+}: TemplatesClientProps) {
   const router = useRouter()
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editing, setEditing] = useState<OpeningTemplate | null>(null)
@@ -119,61 +128,83 @@ export function TemplatesClient({ schoolDefaults, ownTemplates }: TemplatesClien
     }
   }
 
+  const allTemplates = [...schoolDefaults, ...ownTemplates]
+
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Templates</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Recipes for your day. Apply a template to fill a date with openings students can claim.
-          </p>
-        </div>
-        <Button onClick={handleNew}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Template
-        </Button>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Templates &amp; Openings</h1>
+        <p className="text-muted-foreground text-sm mt-1">
+          Define your day recipes, then apply them to dates so students can claim slots.
+        </p>
       </div>
 
-      {/* School defaults */}
-      {schoolDefaults.length > 0 && (
-        <section className="space-y-3">
-          <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-            School defaults
-          </h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {schoolDefaults.map(t => (
-              <TemplateCard key={t.id} template={t} readOnly />
-            ))}
-          </div>
-        </section>
-      )}
+      <Tabs defaultValue="templates">
+        <TabsList>
+          <TabsTrigger value="templates">My Templates</TabsTrigger>
+          <TabsTrigger value="generate">Generate Openings</TabsTrigger>
+        </TabsList>
 
-      {/* Own templates */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-          My custom templates
-        </h2>
-        {ownTemplates.length === 0 ? (
-          <Card className="border-dashed">
-            <CardContent className="py-8 text-center text-sm text-muted-foreground">
-              You haven&apos;t created any custom templates yet. Use the school defaults above, or click{' '}
-              <span className="font-medium">New Template</span> to make your own.
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {ownTemplates.map(t => (
-              <TemplateCard
-                key={t.id}
-                template={t}
-                readOnly={false}
-                onEdit={() => handleEdit(t)}
-                onDelete={() => setDeleting(t)}
-              />
-            ))}
+        {/* ── Tab 1: My Templates ────────────────────────────────── */}
+        <TabsContent value="templates" className="space-y-6 pt-2">
+          <div className="flex items-center justify-end">
+            <Button onClick={handleNew}>
+              <Plus className="mr-2 h-4 w-4" />
+              New Template
+            </Button>
           </div>
-        )}
-      </section>
+
+          {/* School defaults */}
+          {schoolDefaults.length > 0 && (
+            <section className="space-y-3">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                School defaults
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {schoolDefaults.map(t => (
+                  <TemplateCard key={t.id} template={t} readOnly />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Own templates */}
+          <section className="space-y-3">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+              My custom templates
+            </h2>
+            {ownTemplates.length === 0 ? (
+              <Card className="border-dashed">
+                <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                  You haven&apos;t created any custom templates yet. Use the school defaults above, or click{' '}
+                  <span className="font-medium">New Template</span> to make your own.
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {ownTemplates.map(t => (
+                  <TemplateCard
+                    key={t.id}
+                    template={t}
+                    readOnly={false}
+                    onEdit={() => handleEdit(t)}
+                    onDelete={() => setDeleting(t)}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </TabsContent>
+
+        {/* ── Tab 2: Generate Openings ──────────────────────────── */}
+        <TabsContent value="generate" className="pt-2">
+          <GenerateOpeningsClient
+            instructorId={instructorId}
+            templates={allTemplates}
+            upcomingOpenings={upcomingOpenings}
+          />
+        </TabsContent>
+      </Tabs>
 
       <TemplateDialog
         open={dialogOpen}
