@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import { formatTime } from '@/lib/utils'
+import { formatTimeRange } from '@/lib/utils'
 import type { OpeningTemplate } from '@/types'
 
 const DAY_LABELS_SHORT = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
@@ -202,7 +202,7 @@ export function ApplyTemplateDialog({
               <div className="flex flex-wrap gap-1 pt-1">
                 {selectedTemplate.slots.map((s, i) => (
                   <Badge key={i} variant="outline" className="font-normal text-[10px]">
-                    {formatTime(s.start)} · {s.duration_min}m
+                    {formatTimeRange(s.start, s.duration_min)}
                   </Badge>
                 ))}
               </div>
