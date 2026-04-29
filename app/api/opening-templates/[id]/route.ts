@@ -8,6 +8,10 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import {
+  regenerateOpenings,
+  regenerateAllInstructorsInSchool,
+} from '@/lib/services/openings-generator'
 
 const slotSchema = z.object({
   start: z.string().regex(/^\d{2}:\d{2}$/, 'Format must be HH:MM'),
@@ -17,7 +21,19 @@ const slotSchema = z.object({
 const updateSchema = z.object({
   name: z.string().min(1).max(60).optional(),
   slots: z.array(slotSchema).min(1).optional(),
+  day_of_week: z.array(z.number().int().min(0).max(6)).min(1).max(7).optional(),
 })
+
+async function regenerateForTemplate(
+  schoolId: string,
+  templateInstructorId: string | null
+) {
+  if (templateInstructorId) {
+    await regenerateOpenings({ instructorId: templateInstructorId, schoolId })
+  } else {
+    await regenerateAllInstructorsInSchool(schoolId)
+  }
+}
 
 async function loadContext() {
   const supabase = await createClient()
@@ -87,6 +103,7 @@ export async function PATCH(
   const update: Record<string, unknown> = {}
   if (parsed.data.name !== undefined) update.name = parsed.data.name
   if (parsed.data.slots !== undefined) update.slots = parsed.data.slots
+  if (parsed.data.day_of_week !== undefined) update.day_of_week = parsed.data.day_of_week
 
   const adminClient = createAdminClient()
   const { data: tpl, error } = await adminClient
@@ -105,6 +122,8 @@ export async function PATCH(
     }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
+
+  await regenerateForTemplate(ctx.profile.school_id, auth.tpl!.instructor_id)
 
   return NextResponse.json({ template: tpl })
 }
@@ -127,5 +146,8 @@ export async function DELETE(
     .eq('id', id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await regenerateForTemplate(ctx.profile.school_id, auth.tpl!.instructor_id)
+
   return NextResponse.json({ ok: true })
 }

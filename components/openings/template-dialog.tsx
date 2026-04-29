@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog'
 import {
   Select,
@@ -47,6 +48,10 @@ const DURATION_OPTIONS = [
   { value: '120', label: '120 min' },
 ]
 
+// Days ordered Mon–Sun for a work-week feel: 1,2,3,4,5,6,0
+const DAY_ORDER = [1, 2, 3, 4, 5, 6, 0]
+const DAY_SHORT_LABELS: Record<number, string> = { 0: 'Sun', 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat' }
+
 interface TemplateDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
@@ -57,6 +62,8 @@ interface TemplateDialogProps {
 export function TemplateDialog({ open, onOpenChange, template, onSaved }: TemplateDialogProps) {
   const isEdit = !!template
   const [error, setError] = useState<string | null>(null)
+  const [days, setDays] = useState<Set<number>>(new Set([1, 2, 3, 4, 5]))
+  const [submitting, setSubmitting] = useState(false)
 
   const form = useForm<TemplateFormValues>({
     resolver: zodResolver(templateFormSchema),
@@ -80,17 +87,33 @@ export function TemplateDialog({ open, onOpenChange, template, onSaved }: Templa
           duration_min: String(s.duration_min),
         })),
       })
+      setDays(new Set(template.day_of_week ?? [1, 2, 3, 4, 5]))
     } else {
       form.reset({
         name: '',
         slots: [{ start: '09:00', duration_min: '60' }],
       })
+      setDays(new Set([1, 2, 3, 4, 5]))
     }
     setError(null)
   }, [template, form, open])
 
+  function toggleDay(d: number) {
+    setDays(prev => {
+      const next = new Set(prev)
+      if (next.has(d)) next.delete(d)
+      else next.add(d)
+      return next
+    })
+  }
+
   async function onSubmit(values: TemplateFormValues) {
     setError(null)
+
+    if (days.size === 0) {
+      setError('Pick at least one day of the week.')
+      return
+    }
 
     const payload = {
       name: values.name,
@@ -98,8 +121,10 @@ export function TemplateDialog({ open, onOpenChange, template, onSaved }: Templa
         start: s.start,
         duration_min: parseInt(s.duration_min, 10),
       })),
+      day_of_week: Array.from(days).sort(),
     }
 
+    setSubmitting(true)
     const res = isEdit
       ? await fetch(`/api/opening-templates/${template!.id}`, {
           method: 'PATCH',
@@ -111,6 +136,7 @@ export function TemplateDialog({ open, onOpenChange, template, onSaved }: Templa
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         })
+    setSubmitting(false)
 
     if (!res.ok) {
       const data = await res.json()
@@ -127,6 +153,9 @@ export function TemplateDialog({ open, onOpenChange, template, onSaved }: Templa
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{isEdit ? 'Edit Template' : 'New Template'}</DialogTitle>
+          <DialogDescription>
+            Pick the days and slots. The system will auto-generate openings for the next 14 days.
+          </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-2">
@@ -142,6 +171,30 @@ export function TemplateDialog({ open, onOpenChange, template, onSaved }: Templa
             {form.formState.errors.name && (
               <p className="text-xs text-destructive">{form.formState.errors.name.message}</p>
             )}
+          </div>
+
+          {/* Day-of-week selector */}
+          <div className="space-y-1.5">
+            <Label>Days</Label>
+            <div className="flex flex-wrap gap-1.5">
+              {DAY_ORDER.map(d => {
+                const active = days.has(d)
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => toggleDay(d)}
+                    className={`px-3 py-1.5 rounded-md border text-xs font-medium transition-colors ${
+                      active
+                        ? 'border-primary bg-primary text-primary-foreground'
+                        : 'border-input hover:bg-accent'
+                    }`}
+                  >
+                    {DAY_SHORT_LABELS[d]}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           <div className="space-y-2">
@@ -209,8 +262,8 @@ export function TemplateDialog({ open, onOpenChange, template, onSaved }: Templa
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancel
             </Button>
-            <Button type="submit" disabled={form.formState.isSubmitting}>
-              {form.formState.isSubmitting && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+            <Button type="submit" disabled={submitting}>
+              {submitting && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
               {isEdit ? 'Save Changes' : 'Create Template'}
             </Button>
           </DialogFooter>

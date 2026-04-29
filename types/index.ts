@@ -264,6 +264,7 @@ export interface OpeningTemplate {
   instructor_id: string | null  // NULL = school-wide default
   name: string
   slots: OpeningTemplateSlot[]
+  day_of_week: number[]         // 0..6, 0=Sun, 6=Sat — which days the template applies to
   created_at: string
 }
 
@@ -280,4 +281,13 @@ export interface Opening {
 
 export interface OpeningWithInstructor extends Opening {
   instructor: InstructorWithUser
+}
+
+export interface InstructorDayOff {
+  id: string
+  school_id: string
+  instructor_id: string
+  date: string         // YYYY-MM-DD
+  reason: string | null
+  created_at: string
 }
