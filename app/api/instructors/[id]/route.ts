@@ -39,7 +39,7 @@ export async function PATCH(
     .eq('id', user.id)
     .single()
 
-  if (!profile || profile.role !== 'admin') {
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'instructor')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -66,6 +66,23 @@ export async function PATCH(
 
   if (!existing) {
     return NextResponse.json({ error: 'Instructor not found' }, { status: 404 })
+  }
+
+  // Instructors can only edit their own record, and only the bufferMinutes field.
+  // All other fields (license, rates, modality, active flag…) remain admin-only.
+  if (profile.role === 'instructor') {
+    if (existing.user_id !== user.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    const allowed = new Set(['bufferMinutes'])
+    const submittedKeys = Object.keys(updates)
+    const disallowed = submittedKeys.filter(k => !allowed.has(k))
+    if (disallowed.length > 0) {
+      return NextResponse.json(
+        { error: `Instructors can only edit: ${[...allowed].join(', ')}` },
+        { status: 403 }
+      )
+    }
   }
 
   // Split updates between instructors and users tables
