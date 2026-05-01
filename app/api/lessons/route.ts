@@ -39,11 +39,17 @@ export async function GET(request: NextRequest) {
 }
 
 // ── POST ──────────────────────────────────────────────────────
+// Two booking modes:
+//  1. openingId provided  → student claims a published opening; we trust the opening
+//     for time/duration/instructor and just CAS-flip it to 'booked'.
+//  2. no openingId        → admin/instructor free-form booking; runs full conflict +
+//     travel checks against existing lessons.
 const createLessonSchema = z.object({
   studentId: z.string().uuid(),
-  instructorId: z.string().uuid(),
-  scheduledAt: z.string().datetime(),
+  instructorId: z.string().uuid().optional(),
+  scheduledAt: z.string().datetime().optional(),
   durationMinutes: z.number().int().min(15).max(240).default(60),
+  openingId: z.string().uuid().optional(),
   vehicleId: z.string().uuid().nullable().optional(),
   notesCovered: z.string().max(150).optional(),
   notesPractice: z.string().max(150).optional(),
@@ -77,8 +83,44 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { studentId, instructorId, scheduledAt, durationMinutes, vehicleId, notesCovered, notesPractice, notesAdditional, pickupLocation, dropoffLocation, soldBy } = parsed.data
+  const { studentId, vehicleId, notesCovered, notesPractice, notesAdditional, pickupLocation, dropoffLocation, soldBy, openingId } = parsed.data
   const schoolId = profile.school_id
+
+  // ── Resolve booking source (opening vs free-form) ───────────
+  // When openingId is provided we trust it as the source of truth for
+  // instructor + time + duration. Otherwise we fall back to the body fields.
+  let instructorId = parsed.data.instructorId
+  let scheduledAt = parsed.data.scheduledAt
+  let durationMinutes = parsed.data.durationMinutes
+
+  if (openingId) {
+    const { data: opening } = await supabase
+      .from('openings')
+      .select('id, school_id, instructor_id, scheduled_at, duration_minutes, status')
+      .eq('id', openingId)
+      .single()
+
+    if (!opening || opening.school_id !== schoolId) {
+      return NextResponse.json({ error: 'Opening not found.' }, { status: 404 })
+    }
+    if (opening.status !== 'available') {
+      return NextResponse.json(
+        { error: 'This opening is no longer available.' },
+        { status: 409 }
+      )
+    }
+
+    instructorId = opening.instructor_id
+    scheduledAt = opening.scheduled_at
+    durationMinutes = opening.duration_minutes
+  }
+
+  if (!instructorId || !scheduledAt) {
+    return NextResponse.json(
+      { error: 'instructorId and scheduledAt are required when no openingId is provided.' },
+      { status: 400 }
+    )
+  }
 
   // Determine sold_by: instructors creating lessons = 'instructor', otherwise 'school'
   const resolvedSoldBy = soldBy ?? (profile.role === 'instructor' ? 'instructor' : 'school')
@@ -146,7 +188,9 @@ export async function POST(request: NextRequest) {
   const lessonEnd = new Date(lessonStart.getTime() + durationMinutes * 60 * 1000)
 
   // ── Conflict detection ──────────────────────────────────────
-  // Fetch all lessons for this instructor and student on the same day
+  // When booking from an opening, the opening already guarantees the instructor
+  // slot is free (and travel/buffer was respected by the generator). We only need
+  // to check the student doesn't have another lesson at this time elsewhere.
   const dayStart = new Date(lessonStart)
   dayStart.setHours(0, 0, 0, 0)
   const dayEnd = new Date(dayStart)
@@ -168,7 +212,7 @@ export async function POST(request: NextRequest) {
     const overlaps = exStart < lessonEnd && exEnd > lessonStart
 
     if (overlaps) {
-      if (ex.instructor_id === instructorId) {
+      if (!openingId && ex.instructor_id === instructorId) {
         return NextResponse.json(
           { error: 'Instructor already has a lesson at this time.' },
           { status: 409 }
@@ -183,58 +227,82 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ── Travel time check (ZIP-prefix heuristic) ────────────────
-  // Find the closest prev/next lesson for THIS instructor on the same day.
-  // Required gap = max(zip-heuristic, instructor.buffer_minutes).
-  // If a ZIP can't be extracted, fall back to buffer_minutes alone.
-  const bufferMinutes = instructorRecord?.buffer_minutes ?? 0
+  // ── Travel time check (skipped for opening-based bookings) ──
+  // Free-form bookings need this; opening-based bookings inherit the spacing
+  // chosen by the instructor when they published the slot.
+  if (!openingId) {
+    const bufferMinutes = instructorRecord?.buffer_minutes ?? 0
 
-  const sameInstructorToday = (existingLessons ?? [])
-    .filter(ex => ex.instructor_id === instructorId)
-    .map(ex => {
-      const exStart = new Date(ex.scheduled_at).getTime()
-      const exEnd = exStart + ex.duration_minutes * 60 * 1000
-      return { ...ex, exStart, exEnd }
-    })
+    const sameInstructorToday = (existingLessons ?? [])
+      .filter(ex => ex.instructor_id === instructorId)
+      .map(ex => {
+        const exStart = new Date(ex.scheduled_at).getTime()
+        const exEnd = exStart + ex.duration_minutes * 60 * 1000
+        return { ...ex, exStart, exEnd }
+      })
 
-  const prevLesson = sameInstructorToday
-    .filter(ex => ex.exEnd <= lessonStart.getTime())
-    .sort((a, b) => b.exEnd - a.exEnd)[0]
+    const prevLesson = sameInstructorToday
+      .filter(ex => ex.exEnd <= lessonStart.getTime())
+      .sort((a, b) => b.exEnd - a.exEnd)[0]
 
-  const nextLesson = sameInstructorToday
-    .filter(ex => ex.exStart >= lessonEnd.getTime())
-    .sort((a, b) => a.exStart - b.exStart)[0]
+    const nextLesson = sameInstructorToday
+      .filter(ex => ex.exStart >= lessonEnd.getTime())
+      .sort((a, b) => a.exStart - b.exStart)[0]
 
-  if (prevLesson) {
-    const gapMin = Math.round((lessonStart.getTime() - prevLesson.exEnd) / 60000)
-    const travelEst = estimateTravelMinutes(prevLesson.dropoff_location, pickupLocation)
-    const required = Math.max(travelEst ?? 0, bufferMinutes)
-    if (required > 0 && gapMin < required) {
-      return NextResponse.json(
-        {
-          error: `Not enough time after the previous lesson. Need ~${required} min for travel/buffer, only ${gapMin} min available.`,
-        },
-        { status: 409 }
-      )
+    if (prevLesson) {
+      const gapMin = Math.round((lessonStart.getTime() - prevLesson.exEnd) / 60000)
+      const travelEst = estimateTravelMinutes(prevLesson.dropoff_location, pickupLocation)
+      const required = Math.max(travelEst ?? 0, bufferMinutes)
+      if (required > 0 && gapMin < required) {
+        return NextResponse.json(
+          {
+            error: `Not enough time after the previous lesson. Need ~${required} min for travel/buffer, only ${gapMin} min available.`,
+          },
+          { status: 409 }
+        )
+      }
+    }
+
+    if (nextLesson) {
+      const gapMin = Math.round((nextLesson.exStart - lessonEnd.getTime()) / 60000)
+      const travelEst = estimateTravelMinutes(dropoffLocation, nextLesson.pickup_location)
+      const required = Math.max(travelEst ?? 0, bufferMinutes)
+      if (required > 0 && gapMin < required) {
+        return NextResponse.json(
+          {
+            error: `Not enough time before the next lesson. Need ~${required} min for travel/buffer, only ${gapMin} min available.`,
+          },
+          { status: 409 }
+        )
+      }
     }
   }
 
-  if (nextLesson) {
-    const gapMin = Math.round((nextLesson.exStart - lessonEnd.getTime()) / 60000)
-    const travelEst = estimateTravelMinutes(dropoffLocation, nextLesson.pickup_location)
-    const required = Math.max(travelEst ?? 0, bufferMinutes)
-    if (required > 0 && gapMin < required) {
-      return NextResponse.json(
-        {
-          error: `Not enough time before the next lesson. Need ~${required} min for travel/buffer, only ${gapMin} min available.`,
-        },
-        { status: 409 }
-      )
-    }
-  }
-
-  // ── Create the lesson ────────────────────────────────────────
+  // ── Claim the opening (CAS) ─────────────────────────────────
+  // For opening-based bookings, atomically flip status 'available' → 'booked'
+  // BEFORE creating the lesson. If another request beat us to it, the update
+  // matches 0 rows and we return 409. If the lesson insert later fails, we
+  // revert the opening to keep state consistent.
   const adminClient = createAdminClient()
+
+  if (openingId) {
+    const { data: claimed, error: claimError } = await adminClient
+      .from('openings')
+      .update({ status: 'booked' })
+      .eq('id', openingId)
+      .eq('status', 'available')
+      .select('id')
+
+    if (claimError) {
+      return NextResponse.json({ error: claimError.message }, { status: 500 })
+    }
+    if (!claimed || claimed.length === 0) {
+      return NextResponse.json(
+        { error: 'This opening was just booked by someone else.' },
+        { status: 409 }
+      )
+    }
+  }
 
   const { data: lesson, error } = await adminClient
     .from('lessons')
@@ -252,6 +320,7 @@ export async function POST(request: NextRequest) {
       dropoff_location: dropoffLocation ?? '',
       sold_by: resolvedSoldBy,
       price_cents: priceCents,
+      opening_id: openingId ?? null,
     })
     .select(`
       *,
@@ -261,7 +330,16 @@ export async function POST(request: NextRequest) {
     `)
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) {
+    // Revert the opening claim so the slot becomes bookable again.
+    if (openingId) {
+      await adminClient
+        .from('openings')
+        .update({ status: 'available' })
+        .eq('id', openingId)
+    }
+    return NextResponse.json({ error: error.message }, { status: 500 })
+  }
 
   // Decrement lessons_remaining for the student
   const { data: studentRecord2 } = await adminClient
