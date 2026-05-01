@@ -11,6 +11,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -37,6 +47,7 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
   const [isRescheduling, setIsRescheduling] = useState(false)
   const [isMarkingStatus, setIsMarkingStatus] = useState(false)
   const [showReschedule, setShowReschedule] = useState(false)
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false)
   const [rescheduleDate, setRescheduleDate] = useState('')
   const [rescheduleTime, setRescheduleTime] = useState('')
 
@@ -68,6 +79,7 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
         setError(data.error ?? 'Failed to cancel lesson.')
         return
       }
+      setConfirmCancelOpen(false)
       onClose()
       router.refresh()
     } catch {
@@ -305,7 +317,7 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
             <Button
               variant="destructive"
               size="sm"
-              onClick={handleCancel}
+              onClick={() => setConfirmCancelOpen(true)}
               disabled={isCancelling}
             >
               {isCancelling && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
@@ -314,6 +326,33 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
           </div>
         )}
       </DialogContent>
+
+      <AlertDialog open={confirmCancelOpen} onOpenChange={setConfirmCancelOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel this lesson?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will cancel the lesson scheduled for{' '}
+              <strong>{format(lessonStart, 'MMM d, yyyy · h:mm a')}</strong>. This action cannot
+              be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCancelling}>Keep Lesson</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault()
+                handleCancel()
+              }}
+              disabled={isCancelling}
+            >
+              {isCancelling && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+              Yes, Cancel Lesson
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   )
 }
