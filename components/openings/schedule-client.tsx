@@ -605,6 +605,7 @@ export function ScheduleClient({
         onOpenChange={setTplDialogOpen}
         template={editingTpl}
         prefillFrom={prefillTpl}
+        bufferMinutes={bufferMinutes}
         onSaved={() => router.refresh()}
       />
 

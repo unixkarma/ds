@@ -60,7 +60,55 @@ interface TemplateDialogProps {
   // prefillFrom = a starter to copy slots/days/name from (used when "Use this template"
   // is clicked on a school default). Always creates a new instructor-scoped template.
   prefillFrom?: OpeningTemplate | null
+  // bufferMinutes = the instructor's buffer setting. Slots in the same template must
+  // be separated by at least this many minutes (no overlap + min gap). Validated on submit.
+  bufferMinutes: number
   onSaved: () => void
+}
+
+function startToMinutes(start: string): number {
+  const [h, m] = start.split(':').map(Number)
+  return h * 60 + m
+}
+
+// Returns null if slots are valid; otherwise a user-facing error message.
+// Catches: duplicate start times, overlapping slots, and buffer violations.
+function validateSlots(
+  slots: Array<{ start: string; duration_min: number }>,
+  bufferMinutes: number,
+): string | null {
+  const seen = new Set<string>()
+  for (const s of slots) {
+    if (seen.has(s.start)) {
+      return `Duplicate slot at ${s.start}. Each start time must be unique within a template.`
+    }
+    seen.add(s.start)
+  }
+
+  const intervals = slots
+    .map(s => {
+      const st = startToMinutes(s.start)
+      return { startMin: st, endMin: st + s.duration_min, start: s.start, duration: s.duration_min }
+    })
+    .sort((a, b) => a.startMin - b.startMin)
+
+  for (let i = 1; i < intervals.length; i++) {
+    const prev = intervals[i - 1]
+    const curr = intervals[i]
+
+    if (curr.startMin < prev.endMin) {
+      return `Slots overlap: ${prev.start} (${prev.duration}min) ends after ${curr.start} starts.`
+    }
+
+    if (bufferMinutes > 0) {
+      const gap = curr.startMin - prev.endMin
+      if (gap < bufferMinutes) {
+        return `Need ${bufferMinutes}min buffer between ${prev.start} and ${curr.start} (only ${gap}min apart).`
+      }
+    }
+  }
+
+  return null
 }
 
 export function TemplateDialog({
@@ -68,6 +116,7 @@ export function TemplateDialog({
   onOpenChange,
   template,
   prefillFrom,
+  bufferMinutes,
   onSaved,
 }: TemplateDialogProps) {
   const isEdit = !!template
@@ -126,12 +175,20 @@ export function TemplateDialog({
       return
     }
 
+    const normalizedSlots = values.slots.map(s => ({
+      start: s.start,
+      duration_min: parseInt(s.duration_min, 10),
+    }))
+
+    const slotError = validateSlots(normalizedSlots, bufferMinutes)
+    if (slotError) {
+      setError(slotError)
+      return
+    }
+
     const payload = {
       name: values.name,
-      slots: values.slots.map(s => ({
-        start: s.start,
-        duration_min: parseInt(s.duration_min, 10),
-      })),
+      slots: normalizedSlots,
       day_of_week: Array.from(days).sort(),
     }
 
@@ -214,7 +271,14 @@ export function TemplateDialog({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label>Slots</Label>
+              <div className="space-y-0.5">
+                <Label>Slots</Label>
+                {bufferMinutes > 0 && (
+                  <p className="text-[11px] text-muted-foreground">
+                    {bufferMinutes}min buffer required between slots
+                  </p>
+                )}
+              </div>
               <Button
                 type="button"
                 variant="outline"
