@@ -50,7 +50,7 @@ export async function PATCH(
   // Verify the lesson belongs to this school
   const { data: existing } = await supabase
     .from('lessons')
-    .select('id, status, instructor_id, student_id, duration_minutes, school_id, sold_by, price_cents, pickup_location, dropoff_location')
+    .select('id, status, instructor_id, student_id, duration_minutes, school_id, sold_by, price_cents, pickup_location, dropoff_location, opening_id')
     .eq('id', id)
     .eq('school_id', profile.school_id)
     .single()
@@ -245,6 +245,7 @@ export async function PATCH(
   }
 
   // When cancelling a scheduled lesson, refund the lesson credit back to the student
+  // and release any opening it was attached to so other students can grab it.
   if (updates.status === 'cancelled' && existing.status === 'scheduled') {
     const { data: student } = await adminClient
       .from('students')
@@ -257,6 +258,14 @@ export async function PATCH(
         .from('students')
         .update({ lessons_remaining: student.lessons_remaining + 1 })
         .eq('id', existing.student_id)
+    }
+
+    if (existing.opening_id) {
+      await adminClient
+        .from('openings')
+        .update({ status: 'available' })
+        .eq('id', existing.opening_id)
+        .eq('status', 'booked')
     }
   }
 
