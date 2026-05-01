@@ -13,11 +13,18 @@ export default async function StudentBookPage() {
 
   const { data: student } = await supabase
     .from('students')
-    .select('id, lessons_remaining, school_id')
+    .select('id, lessons_remaining, school_id, user:users!user_id(address, city, state, zip_code)')
     .eq('user_id', user.id)
     .single()
 
   if (!student) redirect('/student')
+
+  // Build a sensible default pickup/dropoff from the student's profile address.
+  // Including the ZIP is what makes the travel-time heuristic actually work.
+  const u = (student as unknown as { user: { address: string; city: string; state: string; zip_code: string } }).user
+  const defaultLocation = u
+    ? [u.address, u.city, u.state, u.zip_code].filter(Boolean).join(', ').trim()
+    : ''
 
   // Active instructors in the same school. We don't pull `availability` anymore —
   // the bookable slots come from the `openings` table.
@@ -56,6 +63,7 @@ export default async function StudentBookPage() {
         lessonsRemaining={student.lessons_remaining}
         instructors={(instructors ?? []) as unknown as InstructorWithUser[]}
         openings={(openings ?? []) as unknown as Opening[]}
+        defaultLocation={defaultLocation}
       />
     </div>
   )
