@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { format } from 'date-fns'
-import { CalendarDays, Clock, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { CalendarDays, Clock, Loader2, CheckCircle2, AlertCircle, MapPin } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { cn, getInitials, formatTimeRange } from '@/lib/utils'
@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import type { InstructorWithUser, Opening } from '@/types'
 
 interface BookLessonFlowProps {
@@ -19,6 +21,7 @@ interface BookLessonFlowProps {
   lessonsRemaining: number
   instructors: InstructorWithUser[]
   openings: Opening[]
+  defaultLocation: string
 }
 
 // Group an opening's scheduled_at into a YYYY-MM-DD bucket using the local TZ
@@ -38,11 +41,14 @@ export function BookLessonFlow({
   lessonsRemaining,
   instructors,
   openings,
+  defaultLocation,
 }: BookLessonFlowProps) {
   const router = useRouter()
   const [selectedInstructorId, setSelectedInstructorId] = useState<string | null>(null)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [selectedOpeningId, setSelectedOpeningId] = useState<string | null>(null)
+  const [pickupLocation, setPickupLocation] = useState(defaultLocation)
+  const [dropoffLocation, setDropoffLocation] = useState(defaultLocation)
   const [booking, setBooking] = useState(false)
   const [booked, setBooked] = useState(false)
 
@@ -102,6 +108,10 @@ export function BookLessonFlow({
 
   async function handleBook() {
     if (!selectedOpening) return
+    if (!pickupLocation.trim() || !dropoffLocation.trim()) {
+      toast.error('Please enter both pickup and drop-off locations.')
+      return
+    }
     setBooking(true)
     try {
       const res = await fetch('/api/lessons', {
@@ -110,6 +120,8 @@ export function BookLessonFlow({
         body: JSON.stringify({
           studentId,
           openingId: selectedOpening.id,
+          pickupLocation: pickupLocation.trim(),
+          dropoffLocation: dropoffLocation.trim(),
         }),
       })
 
@@ -308,6 +320,52 @@ export function BookLessonFlow({
         </Card>
       )}
 
+      {/* Step 4 — Pickup & drop-off */}
+      {selectedOpening && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
+                4
+              </span>
+              Pickup &amp; Drop-off
+            </CardTitle>
+            <CardDescription>
+              Include the ZIP code so we can confirm the instructor has time to reach you.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="pickup" className="flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                Pickup address
+              </Label>
+              <Input
+                id="pickup"
+                value={pickupLocation}
+                onChange={e => setPickupLocation(e.target.value)}
+                placeholder="123 N State St, Chicago, IL 60601"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dropoff" className="flex items-center gap-1.5">
+                <MapPin className="h-3.5 w-3.5 text-muted-foreground" />
+                Drop-off address
+              </Label>
+              <Input
+                id="dropoff"
+                value={dropoffLocation}
+                onChange={e => setDropoffLocation(e.target.value)}
+                placeholder="123 N State St, Chicago, IL 60601"
+              />
+              {pickupLocation && dropoffLocation && pickupLocation === dropoffLocation && (
+                <p className="text-xs text-muted-foreground">Same as pickup.</p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Confirm */}
       {selectedOpening && selectedInstructor && (
         <Card>
@@ -323,7 +381,11 @@ export function BookLessonFlow({
                   with {selectedInstructor.user.first_name} {selectedInstructor.user.last_name}
                 </p>
               </div>
-              <Button onClick={handleBook} disabled={booking} size="lg">
+              <Button
+                onClick={handleBook}
+                disabled={booking || !pickupLocation.trim() || !dropoffLocation.trim()}
+                size="lg"
+              >
                 {booking ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 ) : (

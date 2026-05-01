@@ -227,54 +227,55 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ── Travel time check (skipped for opening-based bookings) ──
-  // Free-form bookings need this; opening-based bookings inherit the spacing
-  // chosen by the instructor when they published the slot.
-  if (!openingId) {
-    const bufferMinutes = instructorRecord?.buffer_minutes ?? 0
+  // ── Travel time check ───────────────────────────────────────
+  // Runs for BOTH free-form and opening-based bookings. The regenerator only
+  // avoids strict overlap, so a published opening can still be impossible to
+  // reach from the previous lesson's drop-off. We block here; the student sees
+  // a 409 after clicking. (Long-term cleanup: teach the regenerator to carve
+  // around lessons with buffer/travel so this is rare.)
+  const bufferMinutes = instructorRecord?.buffer_minutes ?? 0
 
-    const sameInstructorToday = (existingLessons ?? [])
-      .filter(ex => ex.instructor_id === instructorId)
-      .map(ex => {
-        const exStart = new Date(ex.scheduled_at).getTime()
-        const exEnd = exStart + ex.duration_minutes * 60 * 1000
-        return { ...ex, exStart, exEnd }
-      })
+  const sameInstructorToday = (existingLessons ?? [])
+    .filter(ex => ex.instructor_id === instructorId)
+    .map(ex => {
+      const exStart = new Date(ex.scheduled_at).getTime()
+      const exEnd = exStart + ex.duration_minutes * 60 * 1000
+      return { ...ex, exStart, exEnd }
+    })
 
-    const prevLesson = sameInstructorToday
-      .filter(ex => ex.exEnd <= lessonStart.getTime())
-      .sort((a, b) => b.exEnd - a.exEnd)[0]
+  const prevLesson = sameInstructorToday
+    .filter(ex => ex.exEnd <= lessonStart.getTime())
+    .sort((a, b) => b.exEnd - a.exEnd)[0]
 
-    const nextLesson = sameInstructorToday
-      .filter(ex => ex.exStart >= lessonEnd.getTime())
-      .sort((a, b) => a.exStart - b.exStart)[0]
+  const nextLesson = sameInstructorToday
+    .filter(ex => ex.exStart >= lessonEnd.getTime())
+    .sort((a, b) => a.exStart - b.exStart)[0]
 
-    if (prevLesson) {
-      const gapMin = Math.round((lessonStart.getTime() - prevLesson.exEnd) / 60000)
-      const travelEst = estimateTravelMinutes(prevLesson.dropoff_location, pickupLocation)
-      const required = Math.max(travelEst ?? 0, bufferMinutes)
-      if (required > 0 && gapMin < required) {
-        return NextResponse.json(
-          {
-            error: `Not enough time after the previous lesson. Need ~${required} min for travel/buffer, only ${gapMin} min available.`,
-          },
-          { status: 409 }
-        )
-      }
+  if (prevLesson) {
+    const gapMin = Math.round((lessonStart.getTime() - prevLesson.exEnd) / 60000)
+    const travelEst = estimateTravelMinutes(prevLesson.dropoff_location, pickupLocation)
+    const required = Math.max(travelEst ?? 0, bufferMinutes)
+    if (required > 0 && gapMin < required) {
+      return NextResponse.json(
+        {
+          error: `Not enough time after the previous lesson. Need ~${required} min for travel/buffer, only ${gapMin} min available.`,
+        },
+        { status: 409 }
+      )
     }
+  }
 
-    if (nextLesson) {
-      const gapMin = Math.round((nextLesson.exStart - lessonEnd.getTime()) / 60000)
-      const travelEst = estimateTravelMinutes(dropoffLocation, nextLesson.pickup_location)
-      const required = Math.max(travelEst ?? 0, bufferMinutes)
-      if (required > 0 && gapMin < required) {
-        return NextResponse.json(
-          {
-            error: `Not enough time before the next lesson. Need ~${required} min for travel/buffer, only ${gapMin} min available.`,
-          },
-          { status: 409 }
-        )
-      }
+  if (nextLesson) {
+    const gapMin = Math.round((nextLesson.exStart - lessonEnd.getTime()) / 60000)
+    const travelEst = estimateTravelMinutes(dropoffLocation, nextLesson.pickup_location)
+    const required = Math.max(travelEst ?? 0, bufferMinutes)
+    if (required > 0 && gapMin < required) {
+      return NextResponse.json(
+        {
+          error: `Not enough time before the next lesson. Need ~${required} min for travel/buffer, only ${gapMin} min available.`,
+        },
+        { status: 409 }
+      )
     }
   }
 
