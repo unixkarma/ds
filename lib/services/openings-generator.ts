@@ -84,7 +84,15 @@ export async function regenerateOpenings({
   const daysOffSet = new Set((daysOff ?? []).map(d => d.date as string))
 
   // 4. Untouchable conflicts (booked/blocked openings + scheduled lessons)
-  const [{ data: nonAvailableOpenings }, { data: lessons }] = await Promise.all([
+  // Each occupied range is inflated by `± buffer_minutes` so a slot directly
+  // adjacent to a lesson — but with no breathing room — won't be published as
+  // an opening (the booking endpoint would 409 it anyway).
+  const [{ data: instructorRow }, { data: nonAvailableOpenings }, { data: lessons }] = await Promise.all([
+    admin
+      .from('instructors')
+      .select('buffer_minutes')
+      .eq('id', instructorId)
+      .single(),
     admin
       .from('openings')
       .select('scheduled_at, duration_minutes')
@@ -101,14 +109,16 @@ export async function regenerateOpenings({
       .lt('scheduled_at', horizon.toISOString()),
   ])
 
+  const bufferMs = ((instructorRow?.buffer_minutes ?? 0) as number) * 60_000
+
   const occupied: { start: number; end: number }[] = []
   for (const o of nonAvailableOpenings ?? []) {
     const s = new Date(o.scheduled_at).getTime()
-    occupied.push({ start: s, end: s + o.duration_minutes * 60_000 })
+    occupied.push({ start: s - bufferMs, end: s + o.duration_minutes * 60_000 + bufferMs })
   }
   for (const l of lessons ?? []) {
     const s = new Date(l.scheduled_at).getTime()
-    occupied.push({ start: s, end: s + l.duration_minutes * 60_000 })
+    occupied.push({ start: s - bufferMs, end: s + l.duration_minutes * 60_000 + bufferMs })
   }
 
   // 5. Build the desired slot set
