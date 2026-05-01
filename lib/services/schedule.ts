@@ -1,7 +1,13 @@
 // Schedule service — server-side data fetching for the calendar.
 
 import { createClient } from '@/lib/supabase/server'
-import type { LessonWithRelations, StudentWithUser, InstructorWithUser, Vehicle } from '@/types'
+import type {
+  LessonWithRelations,
+  StudentWithUser,
+  InstructorWithUser,
+  Vehicle,
+  Opening,
+} from '@/types'
 
 // Fetch all lessons between two dates (inclusive) with full relations
 export async function getLessonsForRange(
@@ -24,6 +30,26 @@ export async function getLessonsForRange(
 
   if (error) throw new Error(error.message)
   return (data ?? []) as unknown as LessonWithRelations[]
+}
+
+// Fetch openings (available + blocked) in the given range — used to overlay
+// the calendar so admin can SEE what slots instructors have published / locked.
+export async function getOpeningsForRange(
+  startDate: Date,
+  endDate: Date
+): Promise<Opening[]> {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('openings')
+    .select('id, school_id, instructor_id, template_id, scheduled_at, duration_minutes, status, created_at')
+    .in('status', ['available', 'blocked'])
+    .gte('scheduled_at', startDate.toISOString())
+    .lt('scheduled_at', endDate.toISOString())
+    .order('scheduled_at', { ascending: true })
+
+  if (error) throw new Error(error.message)
+  return (data ?? []) as Opening[]
 }
 
 // Fetch all active students, active instructors, and active vehicles

@@ -187,10 +187,29 @@ export async function POST(request: NextRequest) {
   const lessonStart = new Date(scheduledAt)
   const lessonEnd = new Date(lessonStart.getTime() + durationMinutes * 60 * 1000)
 
+  // ── Auto-link to a matching opening (admin/instructor free-form) ─
+  // If the caller didn't pass openingId but their (instructor, scheduled_at,
+  // duration) exactly matches a published opening for that instructor, treat
+  // the booking as a claim — link it and CAS-flip below. Keeps the openings
+  // table accurate without requiring the admin UI to know about openings.
+  let matchedOpeningId: string | null = null
+  if (!openingId) {
+    const { data: exact } = await supabase
+      .from('openings')
+      .select('id')
+      .eq('instructor_id', instructorId)
+      .eq('scheduled_at', scheduledAt)
+      .eq('duration_minutes', durationMinutes)
+      .eq('status', 'available')
+      .maybeSingle()
+    if (exact) matchedOpeningId = exact.id
+  }
+  const effectiveOpeningId = openingId ?? matchedOpeningId
+
   // ── Conflict detection ──────────────────────────────────────
-  // When booking from an opening, the opening already guarantees the instructor
-  // slot is free (and travel/buffer was respected by the generator). We only need
-  // to check the student doesn't have another lesson at this time elsewhere.
+  // Always check for actual lesson overlaps. The opening flag doesn't bypass
+  // this — if a real lesson exists, the booking must fail (the DB exclusion
+  // constraints would catch it anyway, but we want a friendly 409).
   const dayStart = new Date(lessonStart)
   dayStart.setHours(0, 0, 0, 0)
   const dayEnd = new Date(dayStart)
@@ -212,7 +231,7 @@ export async function POST(request: NextRequest) {
     const overlaps = exStart < lessonEnd && exEnd > lessonStart
 
     if (overlaps) {
-      if (!openingId && ex.instructor_id === instructorId) {
+      if (ex.instructor_id === instructorId) {
         return NextResponse.json(
           { error: 'Instructor already has a lesson at this time.' },
           { status: 409 }
@@ -280,17 +299,18 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Claim the opening (CAS) ─────────────────────────────────
-  // For opening-based bookings, atomically flip status 'available' → 'booked'
-  // BEFORE creating the lesson. If another request beat us to it, the update
-  // matches 0 rows and we return 409. If the lesson insert later fails, we
-  // revert the opening to keep state consistent.
+  // For both explicit (openingId from student) and auto-matched (admin booked
+  // exactly over an existing opening) cases, atomically flip status
+  // 'available' → 'booked' BEFORE creating the lesson. If another request beat
+  // us to it, the update matches 0 rows and we return 409. If the lesson
+  // insert later fails, we revert the opening to keep state consistent.
   const adminClient = createAdminClient()
 
-  if (openingId) {
+  if (effectiveOpeningId) {
     const { data: claimed, error: claimError } = await adminClient
       .from('openings')
       .update({ status: 'booked' })
-      .eq('id', openingId)
+      .eq('id', effectiveOpeningId)
       .eq('status', 'available')
       .select('id')
 
@@ -321,7 +341,7 @@ export async function POST(request: NextRequest) {
       dropoff_location: dropoffLocation ?? '',
       sold_by: resolvedSoldBy,
       price_cents: priceCents,
-      opening_id: openingId ?? null,
+      opening_id: effectiveOpeningId,
     })
     .select(`
       *,
@@ -333,13 +353,42 @@ export async function POST(request: NextRequest) {
 
   if (error) {
     // Revert the opening claim so the slot becomes bookable again.
-    if (openingId) {
+    if (effectiveOpeningId) {
       await adminClient
         .from('openings')
         .update({ status: 'available' })
-        .eq('id', openingId)
+        .eq('id', effectiveOpeningId)
     }
     return NextResponse.json({ error: error.message }, { status: 500 })
+  }
+
+  // ── Block overlapping openings ──────────────────────────────
+  // Any other 'available' openings for this instructor that overlap the new
+  // lesson are now unbookable — flip them to 'blocked' so they don't show up
+  // on the student book screen. We exclude the one we just claimed (that's
+  // already 'booked'). Idempotent: only flips status='available' rows.
+  const { data: nearbyOpenings } = await adminClient
+    .from('openings')
+    .select('id, scheduled_at, duration_minutes')
+    .eq('instructor_id', instructorId)
+    .eq('status', 'available')
+    .gte('scheduled_at', dayStart.toISOString())
+    .lt('scheduled_at', dayEnd.toISOString())
+
+  const overlappingIds = (nearbyOpenings ?? [])
+    .filter(o => {
+      const oStart = new Date(o.scheduled_at).getTime()
+      const oEnd = oStart + o.duration_minutes * 60 * 1000
+      return oStart < lessonEnd.getTime() && oEnd > lessonStart.getTime()
+    })
+    .map(o => o.id)
+
+  if (overlappingIds.length > 0) {
+    await adminClient
+      .from('openings')
+      .update({ status: 'blocked' })
+      .in('id', overlappingIds)
+      .eq('status', 'available')
   }
 
   // Decrement lessons_remaining for the student

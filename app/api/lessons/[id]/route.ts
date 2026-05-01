@@ -50,7 +50,7 @@ export async function PATCH(
   // Verify the lesson belongs to this school
   const { data: existing } = await supabase
     .from('lessons')
-    .select('id, status, instructor_id, student_id, duration_minutes, school_id, sold_by, price_cents, pickup_location, dropoff_location, opening_id')
+    .select('id, status, instructor_id, student_id, scheduled_at, duration_minutes, school_id, sold_by, price_cents, pickup_location, dropoff_location, opening_id')
     .eq('id', id)
     .eq('school_id', profile.school_id)
     .single()
@@ -266,6 +266,43 @@ export async function PATCH(
         .update({ status: 'available' })
         .eq('id', existing.opening_id)
         .eq('status', 'booked')
+    }
+
+    // Auto-unblock any openings that were blocked because they overlapped THIS
+    // lesson's time slot. Now that the lesson is cancelled, they're free again.
+    // (Edge case: if an admin/instructor had manually `blocked` an opening for
+    // an unrelated reason that happens to overlap the cancelled lesson, this
+    // would unintentionally unblock it. There's no UI for manual blocks today,
+    // so this is acceptable — revisit if/when that flow is added.)
+    const lessonStart = new Date(existing.scheduled_at)
+    const lessonEnd = new Date(lessonStart.getTime() + existing.duration_minutes * 60 * 1000)
+    const dayStart = new Date(lessonStart)
+    dayStart.setHours(0, 0, 0, 0)
+    const dayEnd = new Date(dayStart)
+    dayEnd.setDate(dayEnd.getDate() + 1)
+
+    const { data: blockedNearby } = await adminClient
+      .from('openings')
+      .select('id, scheduled_at, duration_minutes')
+      .eq('instructor_id', existing.instructor_id)
+      .eq('status', 'blocked')
+      .gte('scheduled_at', dayStart.toISOString())
+      .lt('scheduled_at', dayEnd.toISOString())
+
+    const toUnblock = (blockedNearby ?? [])
+      .filter(o => {
+        const oStart = new Date(o.scheduled_at).getTime()
+        const oEnd = oStart + o.duration_minutes * 60 * 1000
+        return oStart < lessonEnd.getTime() && oEnd > lessonStart.getTime()
+      })
+      .map(o => o.id)
+
+    if (toUnblock.length > 0) {
+      await adminClient
+        .from('openings')
+        .update({ status: 'available' })
+        .in('id', toUnblock)
+        .eq('status', 'blocked')
     }
   }
 

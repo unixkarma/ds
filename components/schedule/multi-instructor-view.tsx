@@ -1,7 +1,7 @@
 'use client'
 
 import { getFullName } from '@/lib/utils'
-import type { LessonWithRelations, InstructorWithUser } from '@/types'
+import type { LessonWithRelations, InstructorWithUser, Opening } from '@/types'
 
 const HOUR_HEIGHT = 80
 const START_HOUR = 7
@@ -16,6 +16,11 @@ const STATUS_COLORS: Record<string, string> = {
   no_show: 'bg-red-100 border-red-400 text-red-900',
 }
 
+const OPENING_COLORS: Record<string, string> = {
+  available: 'bg-emerald-50/60 border-emerald-300 border-dashed text-emerald-700',
+  blocked: 'bg-zinc-100/60 border-zinc-300 border-dashed text-zinc-500',
+}
+
 function formatHour(hour: number): string {
   if (hour === 12) return '12 PM'
   if (hour > 12) return `${hour - 12} PM`
@@ -24,6 +29,7 @@ function formatHour(hour: number): string {
 
 interface MultiInstructorViewProps {
   lessons: LessonWithRelations[]
+  openings?: Opening[]
   instructors: InstructorWithUser[]
   selectedDate: Date
   onLessonClick: (lesson: LessonWithRelations) => void
@@ -31,29 +37,39 @@ interface MultiInstructorViewProps {
 
 export function MultiInstructorView({
   lessons,
+  openings = [],
   instructors,
   selectedDate,
   onLessonClick,
 }: MultiInstructorViewProps) {
   const activeInstructors = instructors.filter((i) => i.is_active)
 
-  function getLessonsForInstructor(instructorId: string): LessonWithRelations[] {
-    return lessons.filter((l) => {
-      const ld = new Date(l.scheduled_at)
-      return (
-        l.instructor_id === instructorId &&
-        ld.getFullYear() === selectedDate.getFullYear() &&
-        ld.getMonth() === selectedDate.getMonth() &&
-        ld.getDate() === selectedDate.getDate()
-      )
-    })
+  function isOnSelectedDay(iso: string): boolean {
+    const ld = new Date(iso)
+    return (
+      ld.getFullYear() === selectedDate.getFullYear() &&
+      ld.getMonth() === selectedDate.getMonth() &&
+      ld.getDate() === selectedDate.getDate()
+    )
   }
 
-  function getLessonPosition(lesson: LessonWithRelations) {
-    const start = new Date(lesson.scheduled_at)
+  function getLessonsForInstructor(instructorId: string): LessonWithRelations[] {
+    return lessons.filter(
+      (l) => l.instructor_id === instructorId && isOnSelectedDay(l.scheduled_at)
+    )
+  }
+
+  function getOpeningsForInstructor(instructorId: string): Opening[] {
+    return openings.filter(
+      (o) => o.instructor_id === instructorId && isOnSelectedDay(o.scheduled_at)
+    )
+  }
+
+  function getPosition(scheduled_at: string, duration_minutes: number) {
+    const start = new Date(scheduled_at)
     const startMins = start.getHours() * 60 + start.getMinutes()
     const top = (startMins - START_HOUR * 60) * PX_PER_MIN
-    const height = Math.max(lesson.duration_minutes * PX_PER_MIN, 24)
+    const height = Math.max(duration_minutes * PX_PER_MIN, 24)
     return { top, height }
   }
 
@@ -107,8 +123,28 @@ export function MultiInstructorView({
               />
             ))}
 
+            {/* Openings — render BEHIND lessons */}
+            {getOpeningsForInstructor(inst.id).map((o) => {
+              const { top, height } = getPosition(o.scheduled_at, o.duration_minutes)
+              const colorClass = OPENING_COLORS[o.status] ?? OPENING_COLORS.available
+              const label = o.status === 'blocked' ? 'Blocked' : 'Open'
+              return (
+                <div
+                  key={`o-${o.id}`}
+                  title={`${label} · ${o.duration_minutes} min`}
+                  className={`absolute left-1 right-1 rounded border-2 text-left px-1.5 py-1 text-[10px] overflow-hidden pointer-events-none ${colorClass}`}
+                  style={{ top, height, zIndex: 1 }}
+                >
+                  <div className="font-medium truncate leading-tight">{label}</div>
+                  {height >= 32 && (
+                    <div className="truncate opacity-70 leading-tight">{o.duration_minutes} min</div>
+                  )}
+                </div>
+              )
+            })}
+
             {getLessonsForInstructor(inst.id).map((lesson) => {
-              const { top, height } = getLessonPosition(lesson)
+              const { top, height } = getPosition(lesson.scheduled_at, lesson.duration_minutes)
               const colorClass = STATUS_COLORS[lesson.status] ?? STATUS_COLORS.scheduled
 
               return (
@@ -116,7 +152,7 @@ export function MultiInstructorView({
                   key={lesson.id}
                   onClick={() => onLessonClick(lesson)}
                   className={`absolute left-1 right-1 rounded border text-left px-1.5 py-1 text-xs overflow-hidden hover:brightness-95 transition-all ${colorClass}`}
-                  style={{ top, height }}
+                  style={{ top, height, zIndex: 2 }}
                 >
                   <div className="font-semibold truncate leading-tight">
                     {lesson.student.user.first_name} {lesson.student.user.last_name}
