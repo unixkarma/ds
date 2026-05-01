@@ -1,6 +1,6 @@
 'use client'
 
-import type { LessonWithRelations } from '@/types'
+import type { LessonWithRelations, Opening, InstructorWithUser } from '@/types'
 
 const HOUR_HEIGHT = 80 // px per hour
 const START_HOUR = 7   // 7:00 AM
@@ -15,6 +15,13 @@ const STATUS_COLORS: Record<string, string> = {
   no_show: 'bg-red-100 border-red-400 text-red-900',
 }
 
+// Openings render as backgrounds behind lessons. Visually subordinate so they
+// don't compete with real bookings.
+const OPENING_COLORS: Record<string, string> = {
+  available: 'bg-emerald-50/60 border-emerald-300 border-dashed text-emerald-700',
+  blocked: 'bg-zinc-100/60 border-zinc-300 border-dashed text-zinc-500',
+}
+
 function formatHour(hour: number): string {
   if (hour === 12) return '12 PM'
   if (hour > 12) return `${hour - 12} PM`
@@ -23,11 +30,14 @@ function formatHour(hour: number): string {
 
 interface WeekViewProps {
   lessons: LessonWithRelations[]
+  openings?: Opening[]
   weekStart: Date // Monday of the displayed week
   onLessonClick: (lesson: LessonWithRelations) => void
+  instructors?: InstructorWithUser[] // optional, used to label openings with instructor name
 }
 
-export function WeekView({ lessons, weekStart, onLessonClick }: WeekViewProps) {
+export function WeekView({ lessons, openings = [], weekStart, onLessonClick, instructors = [] }: WeekViewProps) {
+  const instructorById = new Map(instructors.map(i => [i.id, i]))
   // Build Mon–Sun array for this week
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart)
@@ -37,22 +47,28 @@ export function WeekView({ lessons, weekStart, onLessonClick }: WeekViewProps) {
 
   const today = new Date()
 
-  function getLessonsForDay(day: Date): LessonWithRelations[] {
-    return lessons.filter(l => {
-      const ld = new Date(l.scheduled_at)
-      return (
-        ld.getFullYear() === day.getFullYear() &&
-        ld.getMonth() === day.getMonth() &&
-        ld.getDate() === day.getDate()
-      )
-    })
+  function isSameDay(iso: string, day: Date): boolean {
+    const d = new Date(iso)
+    return (
+      d.getFullYear() === day.getFullYear() &&
+      d.getMonth() === day.getMonth() &&
+      d.getDate() === day.getDate()
+    )
   }
 
-  function getLessonPosition(lesson: LessonWithRelations) {
-    const start = new Date(lesson.scheduled_at)
+  function getLessonsForDay(day: Date): LessonWithRelations[] {
+    return lessons.filter(l => isSameDay(l.scheduled_at, day))
+  }
+
+  function getOpeningsForDay(day: Date): Opening[] {
+    return openings.filter(o => isSameDay(o.scheduled_at, day))
+  }
+
+  function getPosition(scheduled_at: string, duration_minutes: number) {
+    const start = new Date(scheduled_at)
     const startMins = start.getHours() * 60 + start.getMinutes()
     const top = (startMins - START_HOUR * 60) * PX_PER_MIN
-    const height = Math.max(lesson.duration_minutes * PX_PER_MIN, 24)
+    const height = Math.max(duration_minutes * PX_PER_MIN, 24)
     return { top, height }
   }
 
@@ -125,9 +141,32 @@ export function WeekView({ lessons, weekStart, onLessonClick }: WeekViewProps) {
                 />
               ))}
 
+              {/* Openings (rendered first → they sit BEHIND lessons z-wise) */}
+              {getOpeningsForDay(day).map(o => {
+                const { top, height } = getPosition(o.scheduled_at, o.duration_minutes)
+                const colorClass = OPENING_COLORS[o.status] ?? OPENING_COLORS.available
+                const inst = instructorById.get(o.instructor_id)
+                const label = o.status === 'blocked' ? 'Blocked' : 'Open'
+                return (
+                  <div
+                    key={`o-${o.id}`}
+                    title={inst ? `${label} · ${inst.user.first_name} ${inst.user.last_name}` : label}
+                    className={`absolute left-1 right-1 rounded border-2 text-left px-1.5 py-1 text-[10px] overflow-hidden pointer-events-none ${colorClass}`}
+                    style={{ top, height, zIndex: 1 }}
+                  >
+                    <div className="font-medium truncate leading-tight">{label}</div>
+                    {inst && height >= 32 && (
+                      <div className="truncate opacity-70 leading-tight">
+                        {inst.user.first_name} {inst.user.last_name}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
               {/* Lessons */}
               {getLessonsForDay(day).map(lesson => {
-                const { top, height } = getLessonPosition(lesson)
+                const { top, height } = getPosition(lesson.scheduled_at, lesson.duration_minutes)
                 const colorClass = STATUS_COLORS[lesson.status] ?? STATUS_COLORS.scheduled
 
                 return (
@@ -135,7 +174,7 @@ export function WeekView({ lessons, weekStart, onLessonClick }: WeekViewProps) {
                     key={lesson.id}
                     onClick={() => onLessonClick(lesson)}
                     className={`absolute left-1 right-1 rounded border text-left px-1.5 py-1 text-xs overflow-hidden hover:brightness-95 transition-all ${colorClass}`}
-                    style={{ top, height }}
+                    style={{ top, height, zIndex: 2 }}
                   >
                     <div className="font-semibold truncate leading-tight">
                       {lesson.student.user.first_name} {lesson.student.user.last_name}

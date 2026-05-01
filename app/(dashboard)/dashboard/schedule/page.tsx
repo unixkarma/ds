@@ -2,21 +2,29 @@
 
 import { Suspense } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
-import { getLessonsForRange, getBookingFormData, getWeekStart, getWeekEnd } from '@/lib/services/schedule'
+import {
+  getLessonsForRange,
+  getOpeningsForRange,
+  getBookingFormData,
+  getWeekStart,
+  getWeekEnd,
+} from '@/lib/services/schedule'
 import { ScheduleClient } from '@/components/schedule/schedule-client'
 
 async function ScheduleContent() {
   const weekStart = getWeekStart(new Date())
   const weekEnd = getWeekEnd(weekStart)
 
-  const [lessons, formData] = await Promise.all([
+  const [lessons, openings, formData] = await Promise.all([
     getLessonsForRange(weekStart, weekEnd),
+    getOpeningsForRange(weekStart, weekEnd),
     getBookingFormData(),
   ])
 
   return (
     <ScheduleClient
       initialLessons={lessons}
+      initialOpenings={openings}
       initialWeekStart={weekStart.toISOString()}
       students={formData.students}
       instructors={formData.instructors}
