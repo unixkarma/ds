@@ -9,6 +9,7 @@ const updateInstructorSchema = z.object({
   firstName: z.string().min(1).optional(),
   lastName: z.string().min(1).optional(),
   phone: z.string().optional(),
+  dateOfBirth: z.string().optional(),
   licenseNumber: z.string().optional(),
   maxLessonsPerDay: z.number().int().min(1).max(20).optional(),
   isActive: z.boolean().optional(),
@@ -103,6 +104,7 @@ export async function PATCH(
   if (updates.firstName !== undefined) userUpdates.first_name = updates.firstName
   if (updates.lastName !== undefined) userUpdates.last_name = updates.lastName
   if (updates.phone !== undefined) userUpdates.phone = updates.phone
+  if (updates.dateOfBirth !== undefined) userUpdates.date_of_birth = updates.dateOfBirth
 
   if (Object.keys(instructorUpdates).length > 0) {
     await adminClient.from('instructors').update(instructorUpdates).eq('id', id)

@@ -3,8 +3,10 @@
 // Event: checkout.session.completed → credit lessons_remaining + record payment
 
 import { NextResponse, type NextRequest } from 'next/server'
+import type Stripe from 'stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createStripeClient } from '@/lib/stripe'
+import { creditLessonsForPayment } from '@/lib/services/payments'
 
 export async function POST(request: NextRequest) {
   const payload = await request.text()
@@ -76,16 +78,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
     }
 
-    // Pull payment method details from Stripe so the revenue report can
-    // show "Visa •••• 4242" and admins can validate against the dashboard.
-    let paymentMethodType: string | null = null
+    // Pull payment method + receipt URL from Stripe so the revenue report
+    // can show "Visa •••• 4242" and the student account page can deep-link.
+    let paymentMethodType: string = 'card'
     let cardBrand: string | null = null
     let cardLast4: string | null = null
+    let receiptUrl: string | null = null
     if (completedSession.payment_intent) {
       try {
         const intent = await stripe.paymentIntents.retrieve(
           completedSession.payment_intent,
-          { expand: ['payment_method'] },
+          { expand: ['payment_method', 'latest_charge'] },
         )
         const pm = intent.payment_method
         if (pm && typeof pm !== 'string') {
@@ -95,40 +98,28 @@ export async function POST(request: NextRequest) {
             cardLast4 = pm.card.last4 ?? null
           }
         }
+        const charge = intent.latest_charge as Stripe.Charge | string | null
+        if (charge && typeof charge !== 'string') {
+          receiptUrl = charge.receipt_url ?? null
+        }
       } catch {
         // Non-fatal: keep going with nulls so we still record the sale.
       }
     }
 
-    // Record the payment
-    await adminClient.from('payments').insert({
-      school_id: schoolId,
-      student_id: studentId,
-      package_id: packageId || null,
-      stripe_payment_intent_id: completedSession.payment_intent ?? '',
-      amount_cents: amountCents,
-      status: 'completed',
-      payment_method: paymentMethodType,
-      card_brand: cardBrand,
-      card_last4: cardLast4,
+    await creditLessonsForPayment({
+      adminClient,
+      schoolId,
+      studentId,
+      packageId,
+      lessonCount,
+      amountCents,
+      paymentMethod: paymentMethodType,
+      cardBrand,
+      cardLast4,
+      stripePaymentIntentId: completedSession.payment_intent ?? null,
+      receiptUrl,
     })
-
-    // Credit lessons to the student
-    const { data: student } = await adminClient
-      .from('students')
-      .select('lessons_remaining, total_lessons_purchased')
-      .eq('id', studentId)
-      .single()
-
-    if (student) {
-      await adminClient
-        .from('students')
-        .update({
-          lessons_remaining: (student.lessons_remaining ?? 0) + lessonCount,
-          total_lessons_purchased: student.total_lessons_purchased + lessonCount,
-        })
-        .eq('id', studentId)
-    }
   }
 
   return NextResponse.json({ received: true })

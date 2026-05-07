@@ -38,7 +38,8 @@ const instructorFormSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string(),
   password: z.string(),
-  phone: z.string(),
+  phone: z.string().min(1, 'Phone is required'),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
   licenseNumber: z.string(),
   maxLessonsPerDay: z.string(),
   modality: z.string(),
@@ -72,6 +73,7 @@ export function InstructorForm({ instructor, schoolBasePriceCents = 0 }: Instruc
       email: '',
       password: '',
       phone: instructor?.user.phone ?? '',
+      dateOfBirth: instructor?.user.date_of_birth ?? '',
       licenseNumber: instructor?.license_number ?? '',
       maxLessonsPerDay: String(instructor?.max_lessons_per_day ?? 6),
       modality: instructor?.modality ?? 'school',
@@ -149,6 +151,7 @@ export function InstructorForm({ instructor, schoolBasePriceCents = 0 }: Instruc
             firstName: values.firstName,
             lastName: values.lastName,
             phone: values.phone,
+            dateOfBirth: values.dateOfBirth,
             licenseNumber: values.licenseNumber,
             maxLessonsPerDay: parseInt(values.maxLessonsPerDay, 10) || 6,
             serviceArea: values.serviceArea,
@@ -166,6 +169,7 @@ export function InstructorForm({ instructor, schoolBasePriceCents = 0 }: Instruc
             email: values.email,
             password: values.password,
             phone: values.phone,
+            dateOfBirth: values.dateOfBirth,
             licenseNumber: values.licenseNumber,
             maxLessonsPerDay: parseInt(values.maxLessonsPerDay, 10) || 6,
             serviceArea: values.serviceArea,
@@ -263,19 +267,34 @@ export function InstructorForm({ instructor, schoolBasePriceCents = 0 }: Instruc
           </>
         )}
 
-        <FormField
-          control={form.control}
-          name="phone"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Phone <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
-              <FormControl>
-                <Input type="tel" placeholder="+1 555 000 0000" {...field} />
-              </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Phone</FormLabel>
+                <FormControl>
+                  <Input type="tel" placeholder="+1 555 000 0000" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="dateOfBirth"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Date of Birth</FormLabel>
+                <FormControl>
+                  <Input type="date" {...field} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField

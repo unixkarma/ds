@@ -29,8 +29,8 @@ const studentFormSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string(),
   password: z.string(),
-  phone: z.string(),
-  dateOfBirth: z.string(),
+  phone: z.string().min(1, 'Phone is required'),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
   notes: z.string(),
 })
 
@@ -207,7 +207,7 @@ export function StudentForm({ student }: StudentFormProps) {
             name="phone"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Phone <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                <FormLabel>Phone</FormLabel>
                 <FormControl>
                   <Input type="tel" placeholder="+1 555 000 0000" {...field} />
                 </FormControl>
@@ -220,7 +220,7 @@ export function StudentForm({ student }: StudentFormProps) {
             name="dateOfBirth"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Date of Birth <span className="text-muted-foreground font-normal">(optional)</span></FormLabel>
+                <FormLabel>Date of Birth</FormLabel>
                 <FormControl>
                   <Input type="date" {...field} />
                 </FormControl>

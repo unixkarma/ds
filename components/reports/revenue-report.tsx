@@ -49,7 +49,7 @@ function methodDisplay(payment: PaymentWithRelations): string {
 }
 
 interface StripeIdProps {
-  id: string
+  id: string | null
 }
 
 function StripeId({ id }: StripeIdProps) {

@@ -35,6 +35,8 @@ const registerSchema = z
     schoolName: z.string().min(2, 'School name must be at least 2 characters'),
     firstName: z.string().min(1, 'First name is required'),
     lastName: z.string().min(1, 'Last name is required'),
+    phone: z.string().min(1, 'Phone number is required'),
+    dateOfBirth: z.string().min(1, 'Date of birth is required'),
     email: z.string().email('Please enter a valid email address'),
     password: z.string().min(8, 'Password must be at least 8 characters'),
     confirmPassword: z.string(),
@@ -59,6 +61,8 @@ export default function RegisterPage() {
       schoolName: '',
       firstName: '',
       lastName: '',
+      phone: '',
+      dateOfBirth: '',
       email: '',
       password: '',
       confirmPassword: '',
@@ -81,6 +85,8 @@ export default function RegisterPage() {
           school_name: values.schoolName,
           first_name: values.firstName,
           last_name: values.lastName,
+          phone: values.phone,
+          date_of_birth: values.dateOfBirth,
         },
       },
     })
@@ -183,6 +189,42 @@ export default function RegisterPage() {
                     <FormLabel>Last Name</FormLabel>
                     <FormControl>
                       <Input placeholder="Doe" autoComplete="family-name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            {/* Phone + DOB side by side */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Phone</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="tel"
+                        placeholder="(555) 123-4567"
+                        autoComplete="tel"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="dateOfBirth"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Date of Birth</FormLabel>
+                    <FormControl>
+                      <Input type="date" autoComplete="bday" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

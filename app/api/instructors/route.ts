@@ -11,7 +11,8 @@ const createInstructorSchema = z.object({
   lastName: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(6),
-  phone: z.string().optional().default(''),
+  phone: z.string().min(1, 'Phone is required'),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
   licenseNumber: z.string().optional().default(''),
   maxLessonsPerDay: z.number().int().min(1).max(20).optional().default(6),
   modality: z.enum(['school', 'independent']).optional().default('school'),
@@ -51,7 +52,8 @@ export async function POST(request: NextRequest) {
   }
 
   const {
-    firstName, lastName, email, password, phone, licenseNumber, maxLessonsPerDay,
+    firstName, lastName, email, password, phone, dateOfBirth,
+    licenseNumber, maxLessonsPerDay,
     modality, commissionRate, hourlyRateCents, lessonPriceCents,
     usesSchoolVehicle, vehicleMonthlyFeeCents, serviceArea, bufferMinutes,
   } = parsed.data
@@ -80,6 +82,7 @@ export async function POST(request: NextRequest) {
     last_name: lastName,
     email,
     phone,
+    date_of_birth: dateOfBirth,
   })
 
   if (userInsertError) {

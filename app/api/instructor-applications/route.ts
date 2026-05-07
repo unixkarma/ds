@@ -20,17 +20,23 @@ export async function POST(request: NextRequest) {
   const firstName = formData.get('firstName') as string | null
   const lastName = formData.get('lastName') as string | null
   const email = formData.get('email') as string | null
-  const phone = (formData.get('phone') as string) ?? ''
+  const phone = ((formData.get('phone') as string) ?? '').trim()
+  const dateOfBirth = ((formData.get('dateOfBirth') as string) ?? '').trim()
   const serviceArea = (formData.get('serviceArea') as string) ?? ''
   const workersCompDoc = formData.get('workersCompDoc') as File | null
   const carInsuranceDoc = formData.get('carInsuranceDoc') as File | null
 
   // Validate required fields
-  if (!registrationCode || !firstName || !lastName || !email) {
+  if (!registrationCode || !firstName || !lastName || !email || !phone || !dateOfBirth) {
     return NextResponse.json(
-      { error: 'Missing required fields: registrationCode, firstName, lastName, email' },
+      { error: 'Missing required fields: registrationCode, firstName, lastName, email, phone, dateOfBirth' },
       { status: 400 }
     )
+  }
+
+  // Validate DOB format (YYYY-MM-DD)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateOfBirth)) {
+    return NextResponse.json({ error: 'Invalid date of birth' }, { status: 400 })
   }
 
   // Validate email format
@@ -101,7 +107,8 @@ export async function POST(request: NextRequest) {
       first_name: firstName.trim(),
       last_name: lastName.trim(),
       email: email.toLowerCase().trim(),
-      phone: phone.trim(),
+      phone,
+      date_of_birth: dateOfBirth,
       service_area: serviceArea.trim(),
     })
     .select('id')

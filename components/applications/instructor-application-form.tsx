@@ -33,6 +33,7 @@ const applicationSchema = z.object({
   lastName: z.string().min(1, 'Last name is required'),
   email: z.string().email('Valid email required'),
   phone: z.string().min(1, 'Phone number is required'),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
   serviceArea: z.string().min(1, 'Service area is required'),
 })
 
@@ -65,6 +66,7 @@ export function InstructorApplicationForm({
       lastName: '',
       email: '',
       phone: '',
+      dateOfBirth: '',
       serviceArea: '',
     },
   })
@@ -90,6 +92,7 @@ export function InstructorApplicationForm({
       formData.append('lastName', values.lastName)
       formData.append('email', values.email)
       formData.append('phone', values.phone)
+      formData.append('dateOfBirth', values.dateOfBirth)
       formData.append('serviceArea', values.serviceArea)
       formData.append('workersCompDoc', workersCompFile)
       formData.append('carInsuranceDoc', carInsuranceFile)
@@ -179,6 +182,13 @@ export function InstructorApplicationForm({
                 </FormItem>
               )} />
             </div>
+            <FormField control={form.control} name="dateOfBirth" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Date of Birth *</FormLabel>
+                <FormControl><Input type="date" {...field} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
             {/* Service Area */}
             <FormField control={form.control} name="serviceArea" render={({ field }) => (
               <FormItem>
