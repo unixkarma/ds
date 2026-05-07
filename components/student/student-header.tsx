@@ -30,6 +30,7 @@ const navLinks = [
   { href: '/student', label: 'Dashboard', exact: true },
   { href: '/student/book', label: 'Book a Lesson' },
   { href: '/student/packages', label: 'Buy Lessons' },
+  { href: '/student/account', label: 'Account' },
 ]
 
 export function StudentHeader({ user, schoolName }: StudentHeaderProps) {

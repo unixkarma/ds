@@ -4,12 +4,14 @@ import type { Metadata } from 'next'
 import { ChevronLeft, Mail, Phone, Calendar, FileText, Pencil, ImageIcon } from 'lucide-react'
 
 import { getStudentById } from '@/lib/services/students'
+import { getActivePackages } from '@/lib/services/packages'
 import { formatDate, formatDateTime, getFullName } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { StudentStatusToggle } from '@/components/students/student-status-toggle'
+import { RecordPaymentDialog } from '@/components/students/record-payment-dialog'
 import type { StudentStatus, LessonStatus } from '@/types'
 
 export const metadata: Metadata = { title: 'Student Details' }
@@ -43,6 +45,7 @@ export default async function StudentDetailPage({
     notFound()
   }
 
+  const packages = await getActivePackages()
   const remaining = student.total_lessons_purchased - student.total_lessons_completed
   const statusConf = studentStatusConfig[student.status]
 
@@ -141,6 +144,8 @@ export default async function StudentDetailPage({
                 {remaining}
               </span>
             </div>
+            <Separator />
+            <RecordPaymentDialog studentId={student.id} packages={packages} />
           </CardContent>
         </Card>
       </div>

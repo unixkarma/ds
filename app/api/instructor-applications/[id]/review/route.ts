@@ -132,6 +132,7 @@ export async function PATCH(
     last_name: application.last_name,
     email: application.email,
     phone: application.phone,
+    date_of_birth: application.date_of_birth,
   })
 
   if (userError) {

@@ -14,8 +14,8 @@ const createStudentSchema = z.object({
   lastName: z.string().min(1),
   email: z.string().email(),
   password: z.string().min(6),
-  phone: z.string().optional().default(''),
-  dateOfBirth: z.string().optional().nullable(),
+  phone: z.string().min(1, 'Phone is required'),
+  dateOfBirth: z.string().min(1, 'Date of birth is required'),
   notes: z.string().optional().nullable(),
 })
 
@@ -80,7 +80,7 @@ export async function POST(request: NextRequest) {
     last_name: lastName,
     email,
     phone,
-    date_of_birth: dateOfBirth ?? null,
+    date_of_birth: dateOfBirth,
   })
 
   if (userInsertError) {

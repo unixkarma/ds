@@ -186,12 +186,13 @@ export interface Payment {
   school_id: string
   student_id: string
   package_id: string | null
-  stripe_payment_intent_id: string
+  stripe_payment_intent_id: string | null
   amount_cents: number
   status: PaymentStatus
   payment_method: string | null
   card_brand: string | null
   card_last4: string | null
+  receipt_url: string | null
   created_at: string
 }
 
@@ -232,6 +233,7 @@ export interface InstructorApplication {
   last_name: string
   email: string
   phone: string
+  date_of_birth: string | null
   workers_comp_doc_url: string | null
   car_insurance_doc_url: string | null
   service_area: string
