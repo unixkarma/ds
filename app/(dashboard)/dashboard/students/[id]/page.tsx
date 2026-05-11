@@ -5,18 +5,25 @@ import { ChevronLeft, Mail, Phone, Calendar, FileText, Pencil, ImageIcon } from 
 
 import { getStudentById } from '@/lib/services/students'
 import { getActivePackages } from '@/lib/services/packages'
-import { formatDate, formatDateTime, getFullName } from '@/lib/utils'
+import {
+  getStudentBalanceCents,
+  getStudentLedger,
+} from '@/lib/services/student-ledger'
+import { getStudentPurchases } from '@/lib/services/student-purchases'
+import { cn, formatCurrency, formatDate, formatDateTime, getFullName } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { StudentStatusToggle } from '@/components/students/student-status-toggle'
 import { RecordPaymentDialog } from '@/components/students/record-payment-dialog'
+import { AdjustBalanceDialog } from '@/components/students/adjust-balance-dialog'
+import { LedgerHistory } from '@/components/students/ledger-history'
+import { PurchasesHistory } from '@/components/students/purchases-history'
 import type { StudentStatus, LessonStatus } from '@/types'
 
 export const metadata: Metadata = { title: 'Student Details' }
 
-// ── Status badge configs ──────────────────────────────────────
 const studentStatusConfig: Record<StudentStatus, { label: string; variant: 'default' | 'secondary' | 'outline' }> = {
   active: { label: 'Active', variant: 'default' },
   inactive: { label: 'Inactive', variant: 'secondary' },
@@ -30,7 +37,6 @@ const lessonStatusConfig: Record<LessonStatus, { label: string; variant: 'defaul
   no_show: { label: 'No Show', variant: 'outline' },
 }
 
-// ── Page ──────────────────────────────────────────────────────
 export default async function StudentDetailPage({
   params,
 }: {
@@ -45,13 +51,18 @@ export default async function StudentDetailPage({
     notFound()
   }
 
-  const packages = await getActivePackages()
+  const [packages, balanceCents, ledger, purchases] = await Promise.all([
+    getActivePackages(),
+    getStudentBalanceCents(id),
+    getStudentLedger(id),
+    getStudentPurchases(id),
+  ])
+
   const remaining = student.total_lessons_purchased - student.total_lessons_completed
   const statusConf = studentStatusConfig[student.status]
 
   return (
     <div className="max-w-4xl space-y-6">
-      {/* Back link */}
       <Link
         href="/dashboard/students"
         className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -60,7 +71,6 @@ export default async function StudentDetailPage({
         Back to Students
       </Link>
 
-      {/* Header */}
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-xl font-semibold">{getFullName(student.user)}</h1>
@@ -115,39 +125,80 @@ export default async function StudentDetailPage({
           </CardContent>
         </Card>
 
-        {/* Lesson balance card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Lesson Balance</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3 text-sm">
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Purchased</span>
-              <span className="font-medium">{student.total_lessons_purchased}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-muted-foreground">Completed</span>
-              <span className="font-medium">{student.total_lessons_completed}</span>
-            </div>
-            <Separator />
-            <div className="flex justify-between">
-              <span className="font-medium">Remaining</span>
-              <span
-                className={
-                  remaining > 0
-                    ? 'font-bold text-primary'
-                    : remaining === 0
-                    ? 'font-bold text-muted-foreground'
-                    : 'font-bold text-destructive'
-                }
-              >
-                {remaining}
-              </span>
-            </div>
-            <Separator />
-            <RecordPaymentDialog studentId={student.id} packages={packages} />
-          </CardContent>
-        </Card>
+        {/* Lessons + Money balance, stacked */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Lesson Balance</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2.5 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Purchased</span>
+                <span className="font-medium">{student.total_lessons_purchased}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Completed</span>
+                <span className="font-medium">{student.total_lessons_completed}</span>
+              </div>
+              <Separator />
+              <div className="flex justify-between">
+                <span className="font-medium">Remaining</span>
+                <span
+                  className={
+                    remaining > 0
+                      ? 'font-bold text-primary'
+                      : remaining === 0
+                      ? 'font-bold text-muted-foreground'
+                      : 'font-bold text-destructive'
+                  }
+                >
+                  {remaining}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Money Balance</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <div className="flex justify-between items-baseline">
+                <span className="text-muted-foreground">
+                  {balanceCents > 0
+                    ? 'Owes'
+                    : balanceCents < 0
+                    ? 'Credit'
+                    : 'Balance'}
+                </span>
+                <span
+                  className={cn(
+                    'text-lg font-bold tabular-nums',
+                    balanceCents > 0
+                      ? 'text-destructive'
+                      : balanceCents < 0
+                      ? 'text-primary'
+                      : 'text-muted-foreground'
+                  )}
+                >
+                  {formatCurrency(Math.abs(balanceCents))}
+                </span>
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <RecordPaymentDialog
+                  studentId={student.id}
+                  packages={packages}
+                  currentBalanceCents={balanceCents}
+                />
+                <AdjustBalanceDialog
+                  studentId={student.id}
+                  currentBalanceCents={balanceCents}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
 
       {/* Permit photo */}
@@ -170,6 +221,26 @@ export default async function StudentDetailPage({
           </CardContent>
         </Card>
       )}
+
+      {/* Purchases */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Purchases</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <PurchasesHistory purchases={purchases} />
+        </CardContent>
+      </Card>
+
+      {/* Balance history */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Balance History</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <LedgerHistory entries={ledger} />
+        </CardContent>
+      </Card>
 
       {/* Lesson history */}
       <Card>

@@ -130,10 +130,12 @@ export function RevenueReport({ payments }: RevenueReportProps) {
 
   const handleExport = () => {
     const columns: CSVColumn<PaymentWithRelations>[] = [
-      { header: 'Date', value: p => format(parseISO(p.created_at), 'yyyy-MM-dd HH:mm') },
+      { header: 'Sale Date', value: p => format(parseISO(p.sale_date), 'yyyy-MM-dd HH:mm') },
+      { header: 'Payment Date', value: p => format(parseISO(p.created_at), 'yyyy-MM-dd HH:mm') },
       { header: 'Student', value: p => getFullName(p.student.user) },
       { header: 'Email', value: p => p.student.user.email ?? '' },
       { header: 'Package', value: p => p.package?.name ?? 'Single Lesson' },
+      { header: 'Concept', value: p => p.description ?? '' },
       { header: 'Method', value: p => methodLabel(p.payment_method) },
       { header: 'Card Brand', value: p => p.card_brand ?? '' },
       { header: 'Card Last4', value: p => p.card_last4 ?? '' },
@@ -297,9 +299,11 @@ export function RevenueReport({ payments }: RevenueReportProps) {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Date</TableHead>
+                <TableHead>Sale</TableHead>
+                <TableHead>Paid</TableHead>
                 <TableHead>Student</TableHead>
                 <TableHead>Package</TableHead>
+                <TableHead>Concept</TableHead>
                 <TableHead>Method</TableHead>
                 <TableHead>Stripe ID</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
@@ -307,29 +311,53 @@ export function RevenueReport({ payments }: RevenueReportProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filtered.map(payment => (
-                <TableRow key={payment.id}>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {formatDate(payment.created_at)}
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {getFullName(payment.student.user)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {payment.package?.name ?? 'Single Lesson'}
-                  </TableCell>
-                  <TableCell className="text-sm">{methodDisplay(payment)}</TableCell>
-                  <TableCell>
-                    <StripeId id={payment.stripe_payment_intent_id} />
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    {formatCurrency(payment.amount_cents)}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant={STATUS_BADGE[payment.status]}>{payment.status}</Badge>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {filtered.map(payment => {
+                const sameDay =
+                  formatDate(payment.sale_date) === formatDate(payment.created_at)
+                return (
+                  <TableRow key={payment.id}>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                      {formatDate(payment.sale_date)}
+                    </TableCell>
+                    <TableCell
+                      className="text-sm whitespace-nowrap"
+                      title={sameDay ? 'Sold and paid same day' : 'Paid after sale'}
+                    >
+                      {sameDay ? (
+                        <span className="text-muted-foreground">
+                          {formatDate(payment.created_at)}
+                        </span>
+                      ) : (
+                        <span className="font-medium text-amber-600">
+                          {formatDate(payment.created_at)}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="font-medium">
+                      {getFullName(payment.student.user)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {payment.package?.name ?? 'Single Lesson'}
+                    </TableCell>
+                    <TableCell
+                      className="text-sm text-muted-foreground max-w-[220px] truncate"
+                      title={payment.description ?? ''}
+                    >
+                      {payment.description || '—'}
+                    </TableCell>
+                    <TableCell className="text-sm">{methodDisplay(payment)}</TableCell>
+                    <TableCell>
+                      <StripeId id={payment.stripe_payment_intent_id} />
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      {formatCurrency(payment.amount_cents)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant={STATUS_BADGE[payment.status]}>{payment.status}</Badge>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </div>

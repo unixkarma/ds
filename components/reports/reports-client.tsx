@@ -32,7 +32,10 @@ export function ReportsClient({ data }: ReportsClientProps) {
       </TabsContent>
 
       <TabsContent value="students" className="mt-6">
-        <StudentProgressReport students={data.students} />
+        <StudentProgressReport
+          students={data.students}
+          balances={data.studentBalances}
+        />
       </TabsContent>
 
       <TabsContent value="instructors" className="mt-6">

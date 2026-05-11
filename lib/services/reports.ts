@@ -3,6 +3,7 @@
 // Client-side filtering is applied after load.
 
 import { createClient } from '@/lib/supabase/server'
+import { getBalancesForStudents } from '@/lib/services/student-ledger'
 import type { LessonWithRelations, PaymentWithRelations, StudentWithUser, InstructorWithUser } from '@/types'
 
 export interface ReportsData {
@@ -10,6 +11,7 @@ export interface ReportsData {
   payments: PaymentWithRelations[]
   students: StudentWithUser[]
   instructors: InstructorWithUser[]
+  studentBalances: Record<string, number>
 }
 
 export async function getReportsData(): Promise<ReportsData> {
@@ -48,10 +50,14 @@ export async function getReportsData(): Promise<ReportsData> {
 
   if (instructorsError) throw new Error(instructorsError.message)
 
+  const studentList = (students ?? []) as unknown as StudentWithUser[]
+  const balances = await getBalancesForStudents(studentList.map((s) => s.id))
+
   return {
     lessons: (lessons ?? []) as unknown as LessonWithRelations[],
     payments: (payments ?? []) as unknown as PaymentWithRelations[],
-    students: (students ?? []) as unknown as StudentWithUser[],
+    students: studentList,
     instructors: (instructors ?? []) as unknown as InstructorWithUser[],
+    studentBalances: Object.fromEntries(balances),
   }
 }

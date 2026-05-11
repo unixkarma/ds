@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Search, UserPlus, MoreHorizontal, Pencil, Power } from 'lucide-react'
 
-import { cn, formatDate, getFullName } from '@/lib/utils'
+import { cn, formatCurrency, formatDate, getFullName } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -40,9 +40,10 @@ const filters: { value: string; label: string }[] = [
 // ── Component ─────────────────────────────────────────────────
 interface StudentTableProps {
   students: StudentWithUser[]
+  balances?: Record<string, number>
 }
 
-export function StudentTable({ students }: StudentTableProps) {
+export function StudentTable({ students, balances = {} }: StudentTableProps) {
   const router = useRouter()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -135,6 +136,9 @@ export function StudentTable({ students }: StudentTableProps) {
                   Enrolled
                 </th>
                 <th className="text-left font-medium text-muted-foreground px-4 py-3">
+                  Lessons
+                </th>
+                <th className="text-left font-medium text-muted-foreground px-4 py-3">
                   Balance
                 </th>
                 <th className="text-left font-medium text-muted-foreground px-4 py-3">Status</th>
@@ -145,6 +149,7 @@ export function StudentTable({ students }: StudentTableProps) {
               {filtered.map((student) => {
                 const remaining =
                   student.total_lessons_purchased - student.total_lessons_completed
+                const balanceCents = balances[student.id] ?? 0
                 return (
                   <tr key={student.id} className="hover:bg-muted/30 transition-colors">
                     <td className="px-4 py-3">
@@ -172,7 +177,23 @@ export function StudentTable({ students }: StudentTableProps) {
                           remaining < 0 && 'text-destructive'
                         )}
                       >
-                        {remaining} lesson{remaining !== 1 ? 's' : ''}
+                        {remaining}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 tabular-nums">
+                      <span
+                        className={cn(
+                          'font-medium',
+                          balanceCents > 0 && 'text-destructive',
+                          balanceCents === 0 && 'text-muted-foreground',
+                          balanceCents < 0 && 'text-primary'
+                        )}
+                      >
+                        {balanceCents === 0
+                          ? '$0.00'
+                          : balanceCents > 0
+                          ? formatCurrency(balanceCents)
+                          : `+${formatCurrency(-balanceCents)}`}
                       </span>
                     </td>
                     <td className="px-4 py-3">
