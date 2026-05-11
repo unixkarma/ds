@@ -94,33 +94,56 @@ export default async function PaymentsPage() {
               <TableRow>
                 <TableHead>Student</TableHead>
                 <TableHead>Package</TableHead>
+                <TableHead>Concept</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
                 <TableHead className="text-center">Status</TableHead>
-                <TableHead>Date</TableHead>
+                <TableHead>Sale</TableHead>
+                <TableHead>Paid</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {payments.map(payment => (
-                <TableRow key={payment.id}>
-                  <TableCell className="font-medium">
-                    {getFullName(payment.student.user)}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {payment.package?.name ?? 'Single Lesson'}
-                  </TableCell>
-                  <TableCell className="text-right font-medium">
-                    ${(payment.amount_cents / 100).toFixed(2)}
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant={STATUS_BADGE[payment.status]}>
-                      {payment.status}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground text-sm">
-                    {format(new Date(payment.created_at), 'MMM d, yyyy')}
-                  </TableCell>
-                </TableRow>
-              ))}
+              {payments.map(payment => {
+                const saleStr = format(new Date(payment.sale_date), 'MMM d, yyyy')
+                const paidStr = format(new Date(payment.created_at), 'MMM d, yyyy')
+                const sameDay = saleStr === paidStr
+                return (
+                  <TableRow key={payment.id}>
+                    <TableCell className="font-medium">
+                      {getFullName(payment.student.user)}
+                    </TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {payment.package?.name ?? 'Single Lesson'}
+                    </TableCell>
+                    <TableCell
+                      className="text-muted-foreground text-sm max-w-[220px] truncate"
+                      title={payment.description ?? ''}
+                    >
+                      {payment.description || '—'}
+                    </TableCell>
+                    <TableCell className="text-right font-medium">
+                      ${(payment.amount_cents / 100).toFixed(2)}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Badge variant={STATUS_BADGE[payment.status]}>
+                        {payment.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-muted-foreground text-sm whitespace-nowrap">
+                      {saleStr}
+                    </TableCell>
+                    <TableCell
+                      className={
+                        sameDay
+                          ? 'text-muted-foreground text-sm whitespace-nowrap'
+                          : 'text-sm whitespace-nowrap font-medium text-amber-600'
+                      }
+                      title={sameDay ? 'Sold and paid same day' : 'Paid after sale'}
+                    >
+                      {paidStr}
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </div>

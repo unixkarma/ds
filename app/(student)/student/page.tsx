@@ -1,11 +1,14 @@
 import { redirect } from 'next/navigation'
 import { format } from 'date-fns'
-import { CalendarDays, CheckCircle, Clock, BookOpen } from 'lucide-react'
+import { AlertTriangle, CalendarDays, CheckCircle, Clock, BookOpen, Wallet } from 'lucide-react'
 
 import { getStudentPortalData } from '@/lib/services/student-portal'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { PermitUpload } from '@/components/student/permit-upload'
+import { LedgerHistory } from '@/components/students/ledger-history'
+import { PurchasesHistory } from '@/components/students/purchases-history'
+import { cn, formatCurrency } from '@/lib/utils'
 import type { LessonWithRelations, LessonStatus } from '@/types'
 
 const STATUS_BADGE: Record<LessonStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -20,7 +23,7 @@ export default async function StudentPortalPage() {
 
   if (!data) redirect('/login')
 
-  const { student, upcomingLessons, recentLessons } = data
+  const { student, upcomingLessons, recentLessons, balanceCents, ledger, purchases } = data
   const lessonsRemaining = student.lessons_remaining ?? 0
 
   return (
@@ -57,6 +60,45 @@ export default async function StudentPortalPage() {
         />
       </div>
 
+      {/* Balance card */}
+      {balanceCents !== 0 ? (
+        <Card
+          className={cn(
+            balanceCents > 0
+              ? 'border-destructive/40 bg-destructive/5'
+              : 'border-emerald-500/40 bg-emerald-500/5'
+          )}
+        >
+          <CardContent className="pt-5 pb-5 flex items-center gap-4">
+            {balanceCents > 0 ? (
+              <AlertTriangle className="h-6 w-6 text-destructive shrink-0" />
+            ) : (
+              <Wallet className="h-6 w-6 text-emerald-600 shrink-0" />
+            )}
+            <div className="flex-1">
+              <p className="text-sm font-medium">
+                {balanceCents > 0
+                  ? 'You have an outstanding balance'
+                  : 'You have a credit on your account'}
+              </p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {balanceCents > 0
+                  ? 'Please contact your driving school to settle this balance.'
+                  : 'This credit will be applied to future purchases.'}
+              </p>
+            </div>
+            <div
+              className={cn(
+                'text-2xl font-bold tabular-nums shrink-0',
+                balanceCents > 0 ? 'text-destructive' : 'text-emerald-700'
+              )}
+            >
+              {formatCurrency(Math.abs(balanceCents))}
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
+
       {/* Permit photo upload */}
       <PermitUpload
         studentId={student.id}
@@ -85,6 +127,30 @@ export default async function StudentPortalPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Purchases */}
+      {purchases.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Your Purchases</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <PurchasesHistory purchases={purchases} />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Balance history */}
+      {ledger.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Account Statement</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <LedgerHistory entries={ledger} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Lesson history */}
       <Card>

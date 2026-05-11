@@ -2,13 +2,21 @@
 // RLS ensures students can only see their own records.
 
 import { createClient } from '@/lib/supabase/server'
-import type { StudentWithUser, LessonWithRelations } from '@/types'
+import type {
+  StudentWithUser,
+  LessonWithRelations,
+  StudentLedgerEntry,
+  StudentPurchase,
+} from '@/types'
 
 export interface StudentPortalData {
   student: StudentWithUser
   upcomingLessons: LessonWithRelations[]
   recentLessons: LessonWithRelations[]
   schoolName: string
+  balanceCents: number
+  ledger: StudentLedgerEntry[]
+  purchases: StudentPurchase[]
 }
 
 export async function getStudentPortalData(): Promise<StudentPortalData | null> {
@@ -62,10 +70,32 @@ export async function getStudentPortalData(): Promise<StudentPortalData | null> 
     .order('scheduled_at', { ascending: false })
     .limit(10)
 
+  // Ledger entries (charges, payments, adjustments) for the student
+  const { data: ledger } = await supabase
+    .from('student_ledger')
+    .select('*')
+    .eq('student_id', student.id)
+    .order('created_at', { ascending: false })
+
+  const balanceCents = (ledger ?? []).reduce(
+    (sum, row: { amount_cents: number }) => sum + Number(row.amount_cents),
+    0
+  )
+
+  // Purchases (one row per package sale)
+  const { data: purchases } = await supabase
+    .from('student_purchases')
+    .select('*')
+    .eq('student_id', student.id)
+    .order('created_at', { ascending: false })
+
   return {
     student: student as unknown as StudentWithUser,
     upcomingLessons: (upcoming ?? []) as unknown as LessonWithRelations[],
     recentLessons: (recent ?? []) as unknown as LessonWithRelations[],
     schoolName: (school as unknown as { name: string } | null)?.name ?? 'HelixDriving',
+    balanceCents,
+    ledger: (ledger ?? []) as unknown as StudentLedgerEntry[],
+    purchases: (purchases ?? []) as unknown as StudentPurchase[],
   }
 }

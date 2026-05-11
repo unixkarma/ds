@@ -7,6 +7,7 @@ import type Stripe from 'stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createStripeClient } from '@/lib/stripe'
 import { creditLessonsForPayment } from '@/lib/services/payments'
+import { createPurchase } from '@/lib/services/student-purchases'
 
 export async function POST(request: NextRequest) {
   const payload = await request.text()
@@ -106,6 +107,29 @@ export async function POST(request: NextRequest) {
         // Non-fatal: keep going with nulls so we still record the sale.
       }
     }
+
+    // Stripe Checkout is always paid in full at sale time, so the purchase
+    // row records the full price as paid and activates all lessons.
+    let packageName = 'Single Lesson'
+    if (packageId) {
+      const { data: pkg } = await adminClient
+        .from('packages')
+        .select('name')
+        .eq('id', packageId)
+        .single()
+      if (pkg?.name) packageName = pkg.name
+    }
+
+    await createPurchase({
+      client: adminClient,
+      schoolId,
+      studentId,
+      packageId,
+      packageName,
+      totalLessons: lessonCount,
+      priceCents: amountCents,
+      amountPaidCents: amountCents,
+    })
 
     await creditLessonsForPayment({
       adminClient,

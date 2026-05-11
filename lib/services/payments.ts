@@ -29,6 +29,8 @@ export interface CreditLessonsArgs {
   cardLast4?: string | null
   stripePaymentIntentId?: string | null
   receiptUrl?: string | null
+  description?: string | null
+  saleDate?: string | null      // ISO timestamp; defaults to now() in DB when omitted
 }
 
 // Records a completed payment and credits the student's lesson balance.
@@ -49,22 +51,28 @@ export async function creditLessonsForPayment(
     cardLast4 = null,
     stripePaymentIntentId = null,
     receiptUrl = null,
+    description = null,
+    saleDate = null,
   } = args
+
+  const insertRow: Record<string, unknown> = {
+    school_id: schoolId,
+    student_id: studentId,
+    package_id: packageId,
+    stripe_payment_intent_id: stripePaymentIntentId,
+    amount_cents: amountCents,
+    status: 'completed',
+    payment_method: paymentMethod,
+    card_brand: cardBrand,
+    card_last4: cardLast4,
+    receipt_url: receiptUrl,
+    description,
+  }
+  if (saleDate) insertRow.sale_date = saleDate
 
   const { data: payment, error: paymentError } = await adminClient
     .from('payments')
-    .insert({
-      school_id: schoolId,
-      student_id: studentId,
-      package_id: packageId,
-      stripe_payment_intent_id: stripePaymentIntentId,
-      amount_cents: amountCents,
-      status: 'completed',
-      payment_method: paymentMethod,
-      card_brand: cardBrand,
-      card_last4: cardLast4,
-      receipt_url: receiptUrl,
-    })
+    .insert(insertRow)
     .select('id')
     .single()
 

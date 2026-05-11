@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { format } from 'date-fns'
-import { Users, BookOpen, CheckSquare, Download } from 'lucide-react'
+import { Users, BookOpen, CheckSquare, Download, DollarSign } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { formatDate, getFullName } from '@/lib/utils'
+import { cn, formatCurrency, formatDate, getFullName } from '@/lib/utils'
 import { toCSV, downloadCSV, type CSVColumn } from '@/lib/csv'
 import type { StudentWithUser, StudentStatus } from '@/types'
 
@@ -33,9 +33,13 @@ const STATUS_BADGE: Record<StudentStatus, 'default' | 'secondary' | 'outline'> =
 
 interface StudentProgressReportProps {
   students: StudentWithUser[]
+  balances?: Record<string, number>
 }
 
-export function StudentProgressReport({ students }: StudentProgressReportProps) {
+export function StudentProgressReport({
+  students,
+  balances = {},
+}: StudentProgressReportProps) {
   const [status, setStatus] = useState('all')
 
   const filtered = useMemo(() => {
@@ -47,6 +51,10 @@ export function StudentProgressReport({ students }: StudentProgressReportProps) 
   const avgCompleted = filtered.length > 0
     ? Math.round(filtered.reduce((sum, s) => sum + s.total_lessons_completed, 0) / filtered.length)
     : 0
+  const totalOwedCents = filtered.reduce(
+    (sum, s) => sum + Math.max(0, balances[s.id] ?? 0),
+    0
+  )
 
   const handleExport = () => {
     const columns: CSVColumn<StudentWithUser>[] = [
@@ -54,14 +62,18 @@ export function StudentProgressReport({ students }: StudentProgressReportProps) 
       { header: 'Email', value: s => s.user.email ?? '' },
       { header: 'Status', value: s => s.status },
       { header: 'Enrolled', value: s => formatDate(s.enrollment_date) },
-      { header: 'Purchased', value: s => s.total_lessons_purchased },
-      { header: 'Completed', value: s => s.total_lessons_completed },
-      { header: 'Remaining', value: s => s.lessons_remaining },
+      { header: 'Lessons Used', value: s => s.total_lessons_completed },
+      { header: 'Lessons Available', value: s => s.lessons_remaining },
+      { header: 'Lessons Purchased', value: s => s.total_lessons_purchased },
       {
         header: 'Progress %',
         value: s => s.total_lessons_purchased > 0
           ? Math.round((s.total_lessons_completed / s.total_lessons_purchased) * 100)
           : 0,
+      },
+      {
+        header: 'Balance ($)',
+        value: s => ((balances[s.id] ?? 0) / 100).toFixed(2),
       },
     ]
     const csv = toCSV(filtered, columns)
@@ -100,7 +112,7 @@ export function StudentProgressReport({ students }: StudentProgressReportProps) 
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
             <CardTitle className="text-sm font-medium text-muted-foreground">Total Students</CardTitle>
@@ -133,6 +145,20 @@ export function StudentProgressReport({ students }: StudentProgressReportProps) 
             <p className="text-xs text-muted-foreground mt-1">Lessons per student</p>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
+            <CardTitle className="text-sm font-medium text-muted-foreground">Total Owed</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <p className={cn('text-2xl font-bold', totalOwedCents > 0 && 'text-destructive')}>
+              {formatCurrency(totalOwedCents)}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {filtered.filter(s => (balances[s.id] ?? 0) > 0).length} with pending balance
+            </p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Table */}
@@ -148,10 +174,14 @@ export function StudentProgressReport({ students }: StudentProgressReportProps) 
                 <TableHead>Student</TableHead>
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead>Enrolled</TableHead>
-                <TableHead className="text-center">Purchased</TableHead>
-                <TableHead className="text-center">Completed</TableHead>
-                <TableHead className="text-center">Remaining</TableHead>
+                <TableHead className="text-center" title="Lessons completed">
+                  Used
+                </TableHead>
+                <TableHead className="text-center" title="Lessons remaining">
+                  Available
+                </TableHead>
                 <TableHead>Progress</TableHead>
+                <TableHead className="text-right">Balance</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -159,6 +189,7 @@ export function StudentProgressReport({ students }: StudentProgressReportProps) 
                 const pct = student.total_lessons_purchased > 0
                   ? Math.round((student.total_lessons_completed / student.total_lessons_purchased) * 100)
                   : 0
+                const balanceCents = balances[student.id] ?? 0
                 return (
                   <TableRow key={student.id}>
                     <TableCell className="font-medium">{getFullName(student.user)}</TableCell>
@@ -168,7 +199,6 @@ export function StudentProgressReport({ students }: StudentProgressReportProps) 
                     <TableCell className="text-sm text-muted-foreground">
                       {formatDate(student.enrollment_date)}
                     </TableCell>
-                    <TableCell className="text-center">{student.total_lessons_purchased}</TableCell>
                     <TableCell className="text-center">{student.total_lessons_completed}</TableCell>
                     <TableCell className="text-center">{student.lessons_remaining}</TableCell>
                     <TableCell>
@@ -181,6 +211,20 @@ export function StudentProgressReport({ students }: StudentProgressReportProps) 
                         </div>
                         <span className="text-xs text-muted-foreground w-8 text-right">{pct}%</span>
                       </div>
+                    </TableCell>
+                    <TableCell
+                      className={cn(
+                        'text-right tabular-nums font-medium',
+                        balanceCents > 0 && 'text-destructive',
+                        balanceCents === 0 && 'text-muted-foreground',
+                        balanceCents < 0 && 'text-primary'
+                      )}
+                    >
+                      {balanceCents === 0
+                        ? '$0.00'
+                        : balanceCents > 0
+                        ? formatCurrency(balanceCents)
+                        : `+${formatCurrency(-balanceCents)}`}
                     </TableCell>
                   </TableRow>
                 )

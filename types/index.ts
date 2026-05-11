@@ -193,6 +193,41 @@ export interface Payment {
   card_brand: string | null
   card_last4: string | null
   receipt_url: string | null
+  description: string | null
+  sale_date: string             // when the package/lessons were added to the student
+  created_at: string            // when the payment money actually arrived (paid_at)
+}
+
+// ── Student Purchases ────────────────────────────────────────
+// One row per package sale. Lessons unlock proportionally to amount_paid_cents.
+export interface StudentPurchase {
+  id: string
+  school_id: string
+  student_id: string
+  package_id: string | null
+  package_name: string
+  total_lessons: number
+  lessons_activated: number      // floor(amount_paid_cents * total_lessons / price_cents)
+  price_cents: number
+  amount_paid_cents: number
+  created_at: string
+}
+
+// ── Student Ledger ───────────────────────────────────────────
+export type LedgerEntryType = 'charge' | 'payment' | 'adjustment'
+export type LedgerPaymentMethod = 'cash' | 'check' | 'other' | 'stripe'
+
+export interface StudentLedgerEntry {
+  id: string
+  school_id: string
+  student_id: string
+  amount_cents: number             // positive = student owes; negative = credit
+  entry_type: LedgerEntryType
+  description: string
+  payment_method: LedgerPaymentMethod | null
+  payment_id: string | null
+  package_id: string | null
+  created_by: string | null
   created_at: string
 }
 
