@@ -11,6 +11,7 @@ const patchSchema = z.object({
   description: z.string().optional(),
   lesson_count: z.number().int().positive().optional(),
   price_cents: z.number().int().positive().optional(),
+  program_type: z.enum(['teen', 'adult', 'both']).optional(),
   is_active: z.boolean().optional(),
 })
 

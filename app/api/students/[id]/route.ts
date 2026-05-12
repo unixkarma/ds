@@ -10,6 +10,7 @@ const updateStudentSchema = z.object({
   lastName: z.string().min(1).optional(),
   phone: z.string().optional(),
   dateOfBirth: z.string().nullable().optional(),
+  ageGroup: z.enum(['teen', 'adult']).optional(),
   notes: z.string().nullable().optional(),
   status: z.enum(['active', 'inactive', 'completed']).optional(),
   totalLessonsPurchased: z.number().int().min(0).optional(),
@@ -58,6 +59,7 @@ export async function PATCH(
   const studentUpdates: Record<string, unknown> = {}
   if (updates.status !== undefined) studentUpdates.status = updates.status
   if (updates.notes !== undefined) studentUpdates.notes = updates.notes
+  if (updates.ageGroup !== undefined) studentUpdates.age_group = updates.ageGroup
   if (updates.totalLessonsPurchased !== undefined)
     studentUpdates.total_lessons_purchased = updates.totalLessonsPurchased
 

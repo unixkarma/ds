@@ -19,6 +19,13 @@ import {
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import type { StudentWithUser } from '@/types'
 
 // ── Single schema for both create and edit ────────────────────
@@ -31,6 +38,7 @@ const studentFormSchema = z.object({
   password: z.string(),
   phone: z.string().min(1, 'Phone is required'),
   dateOfBirth: z.string().min(1, 'Date of birth is required'),
+  ageGroup: z.enum(['teen', 'adult']),
   notes: z.string(),
 })
 
@@ -57,6 +65,7 @@ export function StudentForm({ student }: StudentFormProps) {
       password: '',
       phone: student?.user.phone ?? '',
       dateOfBirth: student?.user.date_of_birth ?? '',
+      ageGroup: student?.age_group ?? 'adult',
       notes: student?.notes ?? '',
     },
   })
@@ -94,6 +103,7 @@ export function StudentForm({ student }: StudentFormProps) {
             lastName: values.lastName,
             phone: values.phone || '',
             dateOfBirth: values.dateOfBirth || null,
+            ageGroup: values.ageGroup,
             notes: values.notes || null,
           }),
         })
@@ -229,6 +239,32 @@ export function StudentForm({ student }: StudentFormProps) {
             )}
           />
         </div>
+
+        {/* Age group — controls which packages this student can access */}
+        <FormField
+          control={form.control}
+          name="ageGroup"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Age Group</FormLabel>
+              <Select value={field.value} onValueChange={field.onChange}>
+                <FormControl>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                </FormControl>
+                <SelectContent>
+                  <SelectItem value="teen">Teen</SelectItem>
+                  <SelectItem value="adult">Adult</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Teens see only teen + universal packages. Adults see only adult + universal.
+              </p>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         {/* Notes */}
         <FormField

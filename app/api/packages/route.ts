@@ -11,6 +11,7 @@ const createSchema = z.object({
   description: z.string().default(''),
   lesson_count: z.number().int().positive(),
   price_cents: z.number().int().positive(),
+  program_type: z.enum(['teen', 'adult', 'both']).default('both'),
 })
 
 export async function GET() {

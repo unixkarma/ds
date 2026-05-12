@@ -32,9 +32,11 @@ export function PurchasesHistory({ purchases }: PurchasesHistoryProps) {
         </thead>
         <tbody className="divide-y">
           {purchases.map((p) => {
-            const owed = p.price_cents - p.amount_paid_cents
-            const fullyPaid = owed === 0
-            const unpaid = p.amount_paid_cents === 0
+            const discount = p.discount_cents ?? 0
+            const effectivePrice = p.price_cents - discount
+            const owed = effectivePrice - p.amount_paid_cents
+            const fullyPaid = owed <= 0
+            const unpaid = p.amount_paid_cents === 0 && effectivePrice > 0
             const status = fullyPaid ? 'Paid' : unpaid ? 'Unpaid' : 'Partial'
             const variant: 'default' | 'destructive' | 'secondary' = fullyPaid
               ? 'default'
@@ -64,8 +66,13 @@ export function PurchasesHistory({ purchases }: PurchasesHistoryProps) {
                   </span>
                   <span className="text-muted-foreground">
                     {' / '}
-                    {formatCurrency(p.price_cents)}
+                    {formatCurrency(effectivePrice)}
                   </span>
+                  {discount > 0 && (
+                    <div className="text-xs text-emerald-600">
+                      −{formatCurrency(discount)} discount
+                    </div>
+                  )}
                 </td>
                 <td className="py-3 text-right">
                   <Badge variant={variant}>{status}</Badge>

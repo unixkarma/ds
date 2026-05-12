@@ -188,6 +188,7 @@ export default async function StudentDetailPage({
               <div className="space-y-2">
                 <RecordPaymentDialog
                   studentId={student.id}
+                  studentAgeGroup={student.age_group}
                   packages={packages}
                   currentBalanceCents={balanceCents}
                 />

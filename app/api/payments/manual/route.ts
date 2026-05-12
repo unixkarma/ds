@@ -32,6 +32,7 @@ const bodySchema = z
     paymentStatus: z.enum(['paid_full', 'partial', 'unpaid']).optional(),
     lessonCount: z.number().int().min(1).optional(),
     amountPaidCents: z.number().int().min(0).optional(),
+    discountCents: z.number().int().min(0).optional(),
     paymentMethod: z.enum(['cash', 'check', 'other']),
     description: z.string().max(200).nullable().optional(),
   })
@@ -42,6 +43,9 @@ const bodySchema = z
       if (v.paymentStatus === 'partial' && (v.amountPaidCents === undefined || v.amountPaidCents <= 0)) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['amountPaidCents'], message: 'amountPaidCents required for partial' })
       }
+    }
+    if (v.mode !== 'package' && v.discountCents !== undefined && v.discountCents > 0) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['discountCents'], message: 'Discount is only allowed in package mode' })
     }
     if (v.mode === 'custom') {
       if (v.lessonCount === undefined) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['lessonCount'], message: 'lessonCount required' })
@@ -118,11 +122,13 @@ export async function POST(request: NextRequest) {
       }
 
       const price = pkg.price_cents
+      const discount = Math.min(parsed.data.discountCents ?? 0, price)
+      const effectivePrice = price - discount
       const paid =
-        paymentStatus === 'paid_full' ? price
-        : paymentStatus === 'partial' ? Math.min(parsed.data.amountPaidCents!, price)
+        paymentStatus === 'paid_full' ? effectivePrice
+        : paymentStatus === 'partial' ? Math.min(parsed.data.amountPaidCents!, effectivePrice)
         : 0
-      const owed = price - paid
+      const owed = effectivePrice - paid
 
       // 1. Create the purchase. Returns the proportional lessons to activate.
       const { id: purchaseId, lessonsActivated } = await createPurchase({
@@ -133,6 +139,7 @@ export async function POST(request: NextRequest) {
         packageName: pkg.name,
         totalLessons: pkg.lesson_count,
         priceCents: price,
+        discountCents: discount,
         amountPaidCents: paid,
       })
 
@@ -148,6 +155,7 @@ export async function POST(request: NextRequest) {
           amountCents: paid,
           paymentMethod,
           description: description ?? null,
+          discountCents: discount,
         })
         paymentId = result.paymentId
       }
