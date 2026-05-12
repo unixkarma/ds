@@ -159,6 +159,12 @@ export function StudentTable({ students, balances = {} }: StudentTableProps) {
                       >
                         {getFullName(student.user)}
                       </Link>
+                      <Badge
+                        variant="outline"
+                        className="ml-2 text-[10px] font-normal px-1.5 py-0"
+                      >
+                        {student.age_group === 'teen' ? 'Teen' : 'Adult'}
+                      </Badge>
                     </td>
                     <td className="px-4 py-3 hidden md:table-cell text-muted-foreground">
                       <div>{student.user.email}</div>

@@ -27,13 +27,23 @@ export default async function StudentPackagesPage({ searchParams }: PageProps) {
 
   const adminClient = createAdminClient()
 
-  // Fetch packages + school config in parallel
+  // Resolve the student's age_group so we can hard-filter packages.
+  // Default to 'adult' if the row is missing for any reason.
+  const { data: studentRow } = await adminClient
+    .from('students')
+    .select('age_group')
+    .eq('user_id', user.id)
+    .single()
+  const ageGroup: 'teen' | 'adult' = studentRow?.age_group === 'teen' ? 'teen' : 'adult'
+
+  // Fetch packages (filtered by age) + school config in parallel
   const [{ data: packagesData }, { data: schoolData }] = await Promise.all([
     adminClient
       .from('packages')
       .select('*')
       .eq('school_id', profile.school_id)
       .eq('is_active', true)
+      .in('program_type', [ageGroup, 'both'])
       .order('price_cents', { ascending: true }),
     adminClient
       .from('schools')

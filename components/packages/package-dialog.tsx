@@ -16,13 +16,21 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
-import type { Package } from '@/types'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import type { Package, ProgramType } from '@/types'
 
 const packageSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string(),
   lesson_count: z.string().min(1, 'Lesson count is required'),
   price_cents: z.string().min(1, 'Price is required'),
+  program_type: z.enum(['teen', 'adult', 'both']),
 })
 
 type PackageValues = z.infer<typeof packageSchema>
@@ -44,6 +52,7 @@ export function PackageDialog({ open, onOpenChange, pkg, onSaved }: PackageDialo
       description: '',
       lesson_count: '',
       price_cents: '',
+      program_type: 'both',
     },
   })
 
@@ -54,9 +63,16 @@ export function PackageDialog({ open, onOpenChange, pkg, onSaved }: PackageDialo
         description: pkg.description,
         lesson_count: String(pkg.lesson_count),
         price_cents: String(pkg.price_cents),
+        program_type: pkg.program_type ?? 'both',
       })
     } else {
-      form.reset({ name: '', description: '', lesson_count: '', price_cents: '' })
+      form.reset({
+        name: '',
+        description: '',
+        lesson_count: '',
+        price_cents: '',
+        program_type: 'both',
+      })
     }
   }, [pkg, form])
 
@@ -66,6 +82,7 @@ export function PackageDialog({ open, onOpenChange, pkg, onSaved }: PackageDialo
       description: values.description,
       lesson_count: parseInt(values.lesson_count, 10),
       price_cents: parseInt(values.price_cents, 10),
+      program_type: values.program_type,
     }
 
     const res = isEdit
@@ -143,6 +160,26 @@ export function PackageDialog({ open, onOpenChange, pkg, onSaved }: PackageDialo
                 <p className="text-xs text-destructive">{form.formState.errors.price_cents.message}</p>
               )}
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="pkg-program-type">Program type</Label>
+            <Select
+              value={form.watch('program_type')}
+              onValueChange={(v) => form.setValue('program_type', v as ProgramType)}
+            >
+              <SelectTrigger id="pkg-program-type">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="both">Both (Teen + Adult)</SelectItem>
+                <SelectItem value="teen">Teen only</SelectItem>
+                <SelectItem value="adult">Adult only</SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Controls which students can see this package in the student portal.
+            </p>
           </div>
 
           <DialogFooter className="pt-2">

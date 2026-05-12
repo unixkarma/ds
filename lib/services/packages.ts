@@ -2,7 +2,7 @@
 // All queries are automatically scoped to the current user's school via RLS.
 
 import { createClient } from '@/lib/supabase/server'
-import type { Package } from '@/types'
+import type { AgeGroup, Package } from '@/types'
 
 export async function getPackages(): Promise<Package[]> {
   const supabase = await createClient()
@@ -16,14 +16,24 @@ export async function getPackages(): Promise<Package[]> {
   return (data ?? []) as Package[]
 }
 
-export async function getActivePackages(): Promise<Package[]> {
+// When `forAgeGroup` is passed, returns only packages matching that age
+// (teen → 'teen' | 'both'; adult → 'adult' | 'both'). Admin contexts
+// should pass nothing to get all active packages.
+export async function getActivePackages(
+  forAgeGroup?: AgeGroup
+): Promise<Package[]> {
   const supabase = await createClient()
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('packages')
     .select('*')
     .eq('is_active', true)
-    .order('price_cents', { ascending: true })
+
+  if (forAgeGroup) {
+    query = query.in('program_type', [forAgeGroup, 'both'])
+  }
+
+  const { data, error } = await query.order('price_cents', { ascending: true })
 
   if (error) throw new Error(error.message)
   return (data ?? []) as Package[]

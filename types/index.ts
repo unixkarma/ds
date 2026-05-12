@@ -62,6 +62,10 @@ export interface UserWithSchool extends User {
   school: School
 }
 
+// ── Student / Package classification ─────────────────────────
+export type AgeGroup = 'teen' | 'adult'
+export type ProgramType = 'teen' | 'adult' | 'both'
+
 // ── Students ─────────────────────────────────────────────────
 export interface Student {
   id: string
@@ -70,6 +74,7 @@ export interface Student {
   parent_user_id: string | null
   enrollment_date: string
   status: StudentStatus
+  age_group: AgeGroup
   total_lessons_purchased: number
   total_lessons_completed: number
   lessons_remaining: number
@@ -178,6 +183,7 @@ export interface Package {
   lesson_count: number
   price_cents: number
   is_active: boolean
+  program_type: ProgramType
 }
 
 // ── Payments ─────────────────────────────────────────────────
@@ -188,6 +194,7 @@ export interface Payment {
   package_id: string | null
   stripe_payment_intent_id: string | null
   amount_cents: number
+  discount_cents: number        // 0 unless a package discount was applied
   status: PaymentStatus
   payment_method: string | null
   card_brand: string | null
@@ -207,8 +214,9 @@ export interface StudentPurchase {
   package_id: string | null
   package_name: string
   total_lessons: number
-  lessons_activated: number      // floor(amount_paid_cents * total_lessons / price_cents)
+  lessons_activated: number      // floor(amount_paid_cents * total_lessons / (price_cents - discount_cents))
   price_cents: number
+  discount_cents: number         // effective price = price_cents - discount_cents
   amount_paid_cents: number
   created_at: string
 }

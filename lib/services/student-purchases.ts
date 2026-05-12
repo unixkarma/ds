@@ -1,5 +1,6 @@
 // Student purchases — one row per package sale. Lessons activate proportionally:
-//   lessons_activated = floor(amount_paid_cents * total_lessons / price_cents)
+//   effective_price       = price_cents - discount_cents
+//   lessons_activated     = floor(amount_paid_cents * total_lessons / effective_price)
 // As balance payments come in, lessons_activated grows and student.lessons_remaining
 // is bumped by the delta. Custom payments and manual ledger adjustments DO NOT
 // create purchase rows.
@@ -28,13 +29,13 @@ export async function getStudentPurchases(
 
 function computeActivated(
   amountPaidCents: number,
-  priceCents: number,
+  effectivePriceCents: number,
   totalLessons: number
 ): number {
-  if (priceCents <= 0) return totalLessons
+  if (effectivePriceCents <= 0) return totalLessons
   if (amountPaidCents <= 0) return 0
-  if (amountPaidCents >= priceCents) return totalLessons
-  return Math.floor((amountPaidCents * totalLessons) / priceCents)
+  if (amountPaidCents >= effectivePriceCents) return totalLessons
+  return Math.floor((amountPaidCents * totalLessons) / effectivePriceCents)
 }
 
 export interface CreatePurchaseArgs {
@@ -46,6 +47,7 @@ export interface CreatePurchaseArgs {
   totalLessons: number
   priceCents: number
   amountPaidCents: number
+  discountCents?: number
 }
 
 // Inserts a new purchase row and returns the number of lessons that should
@@ -63,9 +65,11 @@ export async function createPurchase(args: CreatePurchaseArgs): Promise<{
     totalLessons,
     priceCents,
     amountPaidCents,
+    discountCents = 0,
   } = args
 
-  const lessonsActivated = computeActivated(amountPaidCents, priceCents, totalLessons)
+  const effectivePrice = priceCents - discountCents
+  const lessonsActivated = computeActivated(amountPaidCents, effectivePrice, totalLessons)
 
   const { data, error } = await client
     .from('student_purchases')
@@ -77,6 +81,7 @@ export async function createPurchase(args: CreatePurchaseArgs): Promise<{
       total_lessons: totalLessons,
       lessons_activated: lessonsActivated,
       price_cents: priceCents,
+      discount_cents: discountCents,
       amount_paid_cents: amountPaidCents,
     })
     .select('id')
@@ -126,12 +131,13 @@ export async function applyPaymentToPurchases(
 
   for (const p of (purchases ?? []) as StudentPurchase[]) {
     if (remaining <= 0) break
-    const owed = p.price_cents - p.amount_paid_cents
+    const effectivePrice = p.price_cents - (p.discount_cents ?? 0)
+    const owed = effectivePrice - p.amount_paid_cents
     if (owed <= 0) continue
 
     const applied = Math.min(remaining, owed)
     const newPaid = p.amount_paid_cents + applied
-    const newActivated = computeActivated(newPaid, p.price_cents, p.total_lessons)
+    const newActivated = computeActivated(newPaid, effectivePrice, p.total_lessons)
     const delta = newActivated - p.lessons_activated
 
     const { error: updateErr } = await client

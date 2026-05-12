@@ -16,6 +16,7 @@ const createStudentSchema = z.object({
   password: z.string().min(6),
   phone: z.string().min(1, 'Phone is required'),
   dateOfBirth: z.string().min(1, 'Date of birth is required'),
+  ageGroup: z.enum(['teen', 'adult']).default('adult'),
   notes: z.string().optional().nullable(),
 })
 
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { firstName, lastName, email, password, phone, dateOfBirth, notes } = parsed.data
+  const { firstName, lastName, email, password, phone, dateOfBirth, ageGroup, notes } = parsed.data
   const schoolId = profile.school_id
 
   const adminClient = createAdminClient()
@@ -95,6 +96,7 @@ export async function POST(request: NextRequest) {
     .insert({
       user_id: authUserId,
       school_id: schoolId,
+      age_group: ageGroup,
       notes: notes ?? null,
     })
     .select('*, user:users!user_id(*)')

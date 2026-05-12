@@ -96,6 +96,7 @@ export default async function PaymentsPage() {
                 <TableHead>Package</TableHead>
                 <TableHead>Concept</TableHead>
                 <TableHead className="text-right">Amount</TableHead>
+                <TableHead className="text-right">Discount</TableHead>
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead>Sale</TableHead>
                 <TableHead>Paid</TableHead>
@@ -122,6 +123,17 @@ export default async function PaymentsPage() {
                     </TableCell>
                     <TableCell className="text-right font-medium">
                       ${(payment.amount_cents / 100).toFixed(2)}
+                    </TableCell>
+                    <TableCell
+                      className={
+                        payment.discount_cents > 0
+                          ? 'text-right font-medium text-emerald-600'
+                          : 'text-right text-muted-foreground'
+                      }
+                    >
+                      {payment.discount_cents > 0
+                        ? `−$${(payment.discount_cents / 100).toFixed(2)}`
+                        : '—'}
                     </TableCell>
                     <TableCell className="text-center">
                       <Badge variant={STATUS_BADGE[payment.status]}>

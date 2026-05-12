@@ -30,6 +30,7 @@ export interface CreditLessonsArgs {
   stripePaymentIntentId?: string | null
   receiptUrl?: string | null
   description?: string | null
+  discountCents?: number        // snapshot of the package discount applied at sale time
   saleDate?: string | null      // ISO timestamp; defaults to now() in DB when omitted
 }
 
@@ -52,6 +53,7 @@ export async function creditLessonsForPayment(
     stripePaymentIntentId = null,
     receiptUrl = null,
     description = null,
+    discountCents = 0,
     saleDate = null,
   } = args
 
@@ -61,6 +63,7 @@ export async function creditLessonsForPayment(
     package_id: packageId,
     stripe_payment_intent_id: stripePaymentIntentId,
     amount_cents: amountCents,
+    discount_cents: discountCents,
     status: 'completed',
     payment_method: paymentMethod,
     card_brand: cardBrand,

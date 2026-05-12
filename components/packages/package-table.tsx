@@ -101,6 +101,7 @@ export function PackageTable({ packages, singleLessonPriceCents }: PackageTableP
             <TableHeader>
               <TableRow>
                 <TableHead>Package</TableHead>
+                <TableHead className="text-center">Program</TableHead>
                 <TableHead className="text-center">Lessons</TableHead>
                 <TableHead className="text-right">Price</TableHead>
                 <TableHead className="text-center">Status</TableHead>
@@ -117,6 +118,15 @@ export function PackageTable({ packages, singleLessonPriceCents }: PackageTableP
                         <p className="text-xs text-muted-foreground mt-0.5">{pkg.description}</p>
                       )}
                     </div>
+                  </TableCell>
+                  <TableCell className="text-center">
+                    <Badge variant="outline" className="font-normal">
+                      {pkg.program_type === 'teen'
+                        ? 'Teen'
+                        : pkg.program_type === 'adult'
+                        ? 'Adult'
+                        : 'Both'}
+                    </Badge>
                   </TableCell>
                   <TableCell className="text-center">{pkg.lesson_count}</TableCell>
                   <TableCell className="text-right font-medium">

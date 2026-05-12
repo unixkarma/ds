@@ -21,6 +21,16 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -28,7 +38,7 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { cn, formatCurrency } from '@/lib/utils'
-import type { Package } from '@/types'
+import type { AgeGroup, Package } from '@/types'
 
 type Mode = 'package' | 'custom' | 'balance'
 type PaymentStatus = 'paid_full' | 'partial' | 'unpaid'
@@ -41,6 +51,7 @@ const formSchema = z
     paymentStatus: z.enum(['paid_full', 'partial', 'unpaid']).optional(),
     lessonCount: z.string().optional(),
     amountPaidDollars: z.string().optional(),
+    discountDollars: z.string().optional(),
     paymentMethod: z.enum(['cash', 'check', 'other']),
     description: z.string().max(200).optional(),
   })
@@ -62,6 +73,14 @@ const formSchema = z
             message: 'Enter the amount paid',
           })
         }
+      }
+      const disc = parseFloat(v.discountDollars ?? '')
+      if (v.discountDollars && (!Number.isFinite(disc) || disc < 0)) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['discountDollars'],
+          message: 'Discount must be 0 or more',
+        })
       }
     }
     if (v.mode === 'custom') {
@@ -98,18 +117,23 @@ type FormValues = z.infer<typeof formSchema>
 
 interface RecordPaymentDialogProps {
   studentId: string
+  studentAgeGroup: AgeGroup
   packages: Package[]
   currentBalanceCents?: number
 }
 
 export function RecordPaymentDialog({
   studentId,
+  studentAgeGroup,
   packages,
   currentBalanceCents = 0,
 }: RecordPaymentDialogProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  // Cached form values awaiting confirmation when the package program
+  // doesn't match the student's age_group. Null = no pending confirm.
+  const [pendingValues, setPendingValues] = useState<FormValues | null>(null)
 
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -119,6 +143,7 @@ export function RecordPaymentDialog({
       paymentStatus: 'paid_full',
       lessonCount: '',
       amountPaidDollars: '',
+      discountDollars: '',
       paymentMethod: 'cash',
       description: '',
     },
@@ -128,6 +153,7 @@ export function RecordPaymentDialog({
   const paymentStatus = form.watch('paymentStatus') as PaymentStatus | undefined
   const packageId = form.watch('packageId')
   const amountPaidDollarsStr = form.watch('amountPaidDollars') ?? ''
+  const discountDollarsStr = form.watch('discountDollars') ?? ''
 
   const selectedPackage = useMemo(
     () => packages.find((p) => p.id === packageId) ?? null,
@@ -142,6 +168,7 @@ export function RecordPaymentDialog({
         paymentStatus: 'paid_full',
         lessonCount: '',
         amountPaidDollars: '',
+        discountDollars: '',
         paymentMethod: 'cash',
         description: '',
       })
@@ -149,32 +176,54 @@ export function RecordPaymentDialog({
   }, [open, packages, form])
 
   // Live preview of how the package will affect lessons + balance.
-  // Lessons activate proportionally to amount paid:
-  //   activated = floor(paid * total / price)
+  // Effective price = price - discount. Lessons activate proportionally:
+  //   activated = floor(paid * total / effective_price)
   const packageSummary = useMemo(() => {
     if (mode !== 'package' || !selectedPackage) return null
     const price = selectedPackage.price_cents
     const total = selectedPackage.lesson_count
+    const discRaw = parseFloat(discountDollarsStr)
+    const discount = Number.isFinite(discRaw) && discRaw > 0
+      ? Math.min(Math.round(discRaw * 100), price)
+      : 0
+    const effective = price - discount
     let paid = 0
-    if (paymentStatus === 'paid_full') paid = price
+    if (paymentStatus === 'paid_full') paid = effective
     else if (paymentStatus === 'partial') {
       const parsed = parseFloat(amountPaidDollarsStr)
-      paid = Number.isFinite(parsed) ? Math.min(Math.round(parsed * 100), price) : 0
+      paid = Number.isFinite(parsed) ? Math.min(Math.round(parsed * 100), effective) : 0
     } else paid = 0
-    const owed = Math.max(0, price - paid)
+    const owed = Math.max(0, effective - paid)
     const activated =
-      price <= 0
+      effective <= 0
         ? total
         : paid <= 0
         ? 0
-        : paid >= price
+        : paid >= effective
         ? total
-        : Math.floor((paid * total) / price)
+        : Math.floor((paid * total) / effective)
     const locked = total - activated
-    return { price, paid, owed, total, activated, locked }
-  }, [mode, selectedPackage, paymentStatus, amountPaidDollarsStr])
+    return { price, discount, effective, paid, owed, total, activated, locked }
+  }, [mode, selectedPackage, paymentStatus, amountPaidDollarsStr, discountDollarsStr])
 
-  async function onSubmit(values: FormValues) {
+  // True when the chosen package's program_type conflicts with this student.
+  // Package mode only — custom/balance never have a package picker.
+  const programMismatch = useMemo(() => {
+    if (mode !== 'package' || !selectedPackage) return false
+    const pt = selectedPackage.program_type
+    if (pt === 'both') return false
+    return pt !== studentAgeGroup
+  }, [mode, selectedPackage, studentAgeGroup])
+
+  function onSubmit(values: FormValues) {
+    if (values.mode === 'package' && programMismatch) {
+      setPendingValues(values)
+      return
+    }
+    return submitToApi(values)
+  }
+
+  async function submitToApi(values: FormValues) {
     setSubmitting(true)
 
     const body: Record<string, unknown> = {
@@ -191,6 +240,10 @@ export function RecordPaymentDialog({
         body.amountPaidCents = Math.round(
           parseFloat(values.amountPaidDollars ?? '') * 100
         )
+      }
+      const disc = parseFloat(values.discountDollars ?? '')
+      if (Number.isFinite(disc) && disc > 0) {
+        body.discountCents = Math.round(disc * 100)
       }
     } else if (values.mode === 'custom') {
       body.lessonCount = parseInt(values.lessonCount ?? '', 10)
@@ -230,6 +283,7 @@ export function RecordPaymentDialog({
     paymentStatus === 'partial'
 
   return (
+    <>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline" size="sm" className="w-full">
@@ -341,8 +395,58 @@ export function RecordPaymentDialog({
                 </div>
               )}
 
+              <div className="space-y-1.5">
+                <Label htmlFor="pkg-discount">
+                  Discount ($){' '}
+                  <span className="text-xs text-muted-foreground font-normal">
+                    (optional)
+                  </span>
+                </Label>
+                <Input
+                  id="pkg-discount"
+                  type="number"
+                  step="0.01"
+                  min={0}
+                  placeholder="e.g. 25.00"
+                  {...form.register('discountDollars')}
+                />
+                {form.formState.errors.discountDollars && (
+                  <p className="text-xs text-destructive">
+                    {form.formState.errors.discountDollars.message}
+                  </p>
+                )}
+              </div>
+
+              {programMismatch && selectedPackage && (
+                <div className="rounded-md border border-amber-500/40 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <span className="font-medium">Heads up:</span> this package is
+                  marked{' '}
+                  <span className="font-medium">
+                    {selectedPackage.program_type === 'teen' ? 'Teen only' : 'Adult only'}
+                  </span>
+                  , but this student is{' '}
+                  <span className="font-medium">
+                    {studentAgeGroup === 'teen' ? 'Teen' : 'Adult'}
+                  </span>
+                  . You&apos;ll be asked to confirm.
+                </div>
+              )}
+
               {packageSummary && selectedPackage && (
                 <div className="rounded-md bg-muted/40 border px-3 py-2 text-xs text-muted-foreground space-y-1">
+                  {packageSummary.discount > 0 && (
+                    <div>
+                      Discount{' '}
+                      <span className="font-medium text-foreground">
+                        −{formatCurrency(packageSummary.discount)}
+                      </span>{' '}
+                      → effective price{' '}
+                      <span className="font-medium text-foreground">
+                        {formatCurrency(packageSummary.effective)}
+                      </span>
+                      .
+                    </div>
+                  )}
                   <div>
                     Will activate{' '}
                     <span className="font-medium text-foreground">
@@ -505,6 +609,46 @@ export function RecordPaymentDialog({
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Soft confirm when admin assigns a mismatched program (teen↔adult) */}
+    <AlertDialog
+      open={!!pendingValues}
+      onOpenChange={(o) => {
+        if (!o) setPendingValues(null)
+      }}
+    >
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Mismatched program</AlertDialogTitle>
+          <AlertDialogDescription>
+            This package is for{' '}
+            <span className="font-medium">
+              {selectedPackage?.program_type === 'teen' ? 'teens' : 'adults'}
+            </span>{' '}
+            but the student is{' '}
+            <span className="font-medium">
+              {studentAgeGroup === 'teen' ? 'a teen' : 'an adult'}
+            </span>
+            . Are you sure you want to assign it?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={() => setPendingValues(null)}>
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction
+            onClick={() => {
+              const v = pendingValues
+              setPendingValues(null)
+              if (v) submitToApi(v)
+            }}
+          >
+            Yes, assign anyway
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   )
 }
 
