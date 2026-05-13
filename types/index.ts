@@ -78,6 +78,7 @@ export interface Student {
   total_lessons_purchased: number
   total_lessons_completed: number
   lessons_remaining: number
+  classroom_sessions_attended: number
   notes: string | null
   emergency_contact_name: string
   emergency_contact_phone: string
@@ -181,6 +182,7 @@ export interface Package {
   name: string
   description: string
   lesson_count: number
+  classroom_required: number
   price_cents: number
   is_active: boolean
   program_type: ProgramType
@@ -215,6 +217,7 @@ export interface StudentPurchase {
   package_name: string
   total_lessons: number
   lessons_activated: number      // floor(amount_paid_cents * total_lessons / (price_cents - discount_cents))
+  classroom_required: number     // snapshot of package.classroom_required at purchase time
   price_cents: number
   discount_cents: number         // effective price = price_cents - discount_cents
   amount_paid_cents: number
@@ -335,4 +338,49 @@ export interface InstructorDayOff {
   date: string         // YYYY-MM-DD
   reason: string | null
   created_at: string
+}
+
+// ── Classroom (group) sessions ────────────────────────────────
+export type ClassroomSessionStatus = 'scheduled' | 'completed' | 'cancelled'
+export type ClassroomAttendanceStatus =
+  | 'enrolled'
+  | 'present'
+  | 'absent'
+  | 'late'
+  | 'excused'
+
+export interface ClassroomSession {
+  id: string
+  school_id: string
+  instructor_id: string | null
+  scheduled_at: string
+  duration_minutes: number
+  capacity: number
+  topic: string
+  location: string
+  status: ClassroomSessionStatus
+  notes: string
+  price_cents: number
+  instructor_earning_cents: number
+  created_at: string
+}
+
+export interface ClassroomAttendance {
+  id: string
+  session_id: string
+  student_id: string
+  school_id: string
+  status: ClassroomAttendanceStatus
+  marked_at: string | null
+  marked_by: string | null
+  created_at: string
+}
+
+export interface ClassroomAttendanceWithStudent extends ClassroomAttendance {
+  student: StudentWithUser
+}
+
+export interface ClassroomSessionWithRelations extends ClassroomSession {
+  instructor: InstructorWithUser | null
+  attendance: ClassroomAttendanceWithStudent[]
 }

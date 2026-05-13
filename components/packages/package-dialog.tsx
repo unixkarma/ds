@@ -29,6 +29,7 @@ const packageSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string(),
   lesson_count: z.string().min(1, 'Lesson count is required'),
+  classroom_required: z.string(),
   price_cents: z.string().min(1, 'Price is required'),
   program_type: z.enum(['teen', 'adult', 'both']),
 })
@@ -51,6 +52,7 @@ export function PackageDialog({ open, onOpenChange, pkg, onSaved }: PackageDialo
       name: '',
       description: '',
       lesson_count: '',
+      classroom_required: '0',
       price_cents: '',
       program_type: 'both',
     },
@@ -62,6 +64,7 @@ export function PackageDialog({ open, onOpenChange, pkg, onSaved }: PackageDialo
         name: pkg.name,
         description: pkg.description,
         lesson_count: String(pkg.lesson_count),
+        classroom_required: String(pkg.classroom_required ?? 0),
         price_cents: String(pkg.price_cents),
         program_type: pkg.program_type ?? 'both',
       })
@@ -70,6 +73,7 @@ export function PackageDialog({ open, onOpenChange, pkg, onSaved }: PackageDialo
         name: '',
         description: '',
         lesson_count: '',
+        classroom_required: '0',
         price_cents: '',
         program_type: 'both',
       })
@@ -81,6 +85,7 @@ export function PackageDialog({ open, onOpenChange, pkg, onSaved }: PackageDialo
       name: values.name,
       description: values.description,
       lesson_count: parseInt(values.lesson_count, 10),
+      classroom_required: parseInt(values.classroom_required || '0', 10),
       price_cents: parseInt(values.price_cents, 10),
       program_type: values.program_type,
     }
@@ -131,7 +136,7 @@ export function PackageDialog({ open, onOpenChange, pkg, onSaved }: PackageDialo
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="pkg-lessons">Number of Lessons</Label>
+              <Label htmlFor="pkg-lessons">BTW lessons</Label>
               <Input
                 id="pkg-lessons"
                 placeholder="10"
@@ -143,23 +148,36 @@ export function PackageDialog({ open, onOpenChange, pkg, onSaved }: PackageDialo
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="pkg-price">Price (cents)</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  id="pkg-price"
-                  placeholder="49900"
-                  {...form.register('price_cents')}
-                />
-              </div>
-              {form.watch('price_cents') && (
-                <p className="text-xs text-muted-foreground">
-                  = ${(parseInt(form.watch('price_cents') || '0', 10) / 100).toFixed(2)}
-                </p>
-              )}
-              {form.formState.errors.price_cents && (
-                <p className="text-xs text-destructive">{form.formState.errors.price_cents.message}</p>
-              )}
+              <Label htmlFor="pkg-classroom">Classroom hours</Label>
+              <Input
+                id="pkg-classroom"
+                placeholder="0"
+                inputMode="numeric"
+                {...form.register('classroom_required')}
+              />
+              <p className="text-xs text-muted-foreground">
+                State-required in-room hours (separate from BTW).
+              </p>
             </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="pkg-price">Price (cents)</Label>
+            <div className="flex items-center gap-2">
+              <Input
+                id="pkg-price"
+                placeholder="49900"
+                {...form.register('price_cents')}
+              />
+            </div>
+            {form.watch('price_cents') && (
+              <p className="text-xs text-muted-foreground">
+                = ${(parseInt(form.watch('price_cents') || '0', 10) / 100).toFixed(2)}
+              </p>
+            )}
+            {form.formState.errors.price_cents && (
+              <p className="text-xs text-destructive">{form.formState.errors.price_cents.message}</p>
+            )}
           </div>
 
           <div className="space-y-1.5">

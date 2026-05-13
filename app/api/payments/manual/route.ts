@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
     if (mode === 'package') {
       const { data: pkg } = await adminClient
         .from('packages')
-        .select('id, school_id, name, lesson_count, price_cents')
+        .select('id, school_id, name, lesson_count, price_cents, classroom_required')
         .eq('id', packageId!)
         .eq('school_id', profile.school_id)
         .single()
@@ -141,6 +141,7 @@ export async function POST(request: NextRequest) {
         priceCents: price,
         discountCents: discount,
         amountPaidCents: paid,
+        classroomRequired: pkg.classroom_required ?? 0,
       })
 
       // 2. Record the payment + bump lessons (only the activated portion)

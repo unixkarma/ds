@@ -13,6 +13,7 @@ import {
   Package,
   Settings,
   ClipboardList,
+  GraduationCap,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -24,6 +25,7 @@ const navItems = [
   { href: '/dashboard/instructors', label: 'Instructors', icon: UserCheck },
   { href: '/dashboard/applications', label: 'Applications', icon: ClipboardList, badge: true },
   { href: '/dashboard/schedule', label: 'Schedule', icon: Calendar },
+  { href: '/dashboard/classroom', label: 'Classroom', icon: GraduationCap },
   { href: '/dashboard/vehicles', label: 'Vehicles', icon: Car },
   { href: '/dashboard/packages', label: 'Packages', icon: Package },
   { href: '/dashboard/payments', label: 'Payments', icon: CreditCard },

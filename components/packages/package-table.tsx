@@ -102,7 +102,8 @@ export function PackageTable({ packages, singleLessonPriceCents }: PackageTableP
               <TableRow>
                 <TableHead>Package</TableHead>
                 <TableHead className="text-center">Program</TableHead>
-                <TableHead className="text-center">Lessons</TableHead>
+                <TableHead className="text-center">BTW</TableHead>
+                <TableHead className="text-center">Classroom</TableHead>
                 <TableHead className="text-right">Price</TableHead>
                 <TableHead className="text-center">Status</TableHead>
                 <TableHead className="text-right">Actions</TableHead>
@@ -129,6 +130,9 @@ export function PackageTable({ packages, singleLessonPriceCents }: PackageTableP
                     </Badge>
                   </TableCell>
                   <TableCell className="text-center">{pkg.lesson_count}</TableCell>
+                  <TableCell className="text-center">
+                    {pkg.classroom_required ? `${pkg.classroom_required} h` : '—'}
+                  </TableCell>
                   <TableCell className="text-right font-medium">
                     ${(pkg.price_cents / 100).toFixed(2)}
                   </TableCell>
