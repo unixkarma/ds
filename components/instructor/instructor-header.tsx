@@ -23,9 +23,10 @@ interface InstructorHeaderProps {
     email: string
   }
   schoolName: string
+  hasClassroomSessions?: boolean
 }
 
-const navLinks = [
+const baseNavLinks = [
   { href: '/instructor', label: 'Dashboard', exact: true },
   { href: '/instructor/calendar', label: 'Calendar' },
   { href: '/instructor/schedule', label: 'Schedule' },
@@ -33,7 +34,14 @@ const navLinks = [
   { href: '/instructor/earnings', label: 'Earnings' },
 ]
 
-export function InstructorHeader({ user, schoolName }: InstructorHeaderProps) {
+export function InstructorHeader({ user, schoolName, hasClassroomSessions = false }: InstructorHeaderProps) {
+  const navLinks = hasClassroomSessions
+    ? [
+        ...baseNavLinks.slice(0, 3),
+        { href: '/instructor/classroom', label: 'Classroom' },
+        ...baseNavLinks.slice(3),
+      ]
+    : baseNavLinks
   const router = useRouter()
   const pathname = usePathname()
 

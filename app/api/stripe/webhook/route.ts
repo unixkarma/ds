@@ -111,13 +111,15 @@ export async function POST(request: NextRequest) {
     // Stripe Checkout is always paid in full at sale time, so the purchase
     // row records the full price as paid and activates all lessons.
     let packageName = 'Single Lesson'
+    let classroomRequired = 0
     if (packageId) {
       const { data: pkg } = await adminClient
         .from('packages')
-        .select('name')
+        .select('name, classroom_required')
         .eq('id', packageId)
         .single()
       if (pkg?.name) packageName = pkg.name
+      classroomRequired = pkg?.classroom_required ?? 0
     }
 
     await createPurchase({
@@ -129,6 +131,7 @@ export async function POST(request: NextRequest) {
       totalLessons: lessonCount,
       priceCents: amountCents,
       amountPaidCents: amountCents,
+      classroomRequired,
     })
 
     await creditLessonsForPayment({

@@ -1,5 +1,5 @@
-// PATCH /api/packages/[id] — update a package (admin only)
-// DELETE /api/packages/[id] — delete a package (admin only)
+// PATCH /api/classroom/[id] — update or cancel a classroom session
+// DELETE /api/classroom/[id] — delete a classroom session (admin only)
 
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
@@ -7,13 +7,16 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
 const patchSchema = z.object({
-  name: z.string().min(1).optional(),
-  description: z.string().optional(),
-  lesson_count: z.number().int().nonnegative().optional(),
-  classroom_required: z.number().int().nonnegative().optional(),
-  price_cents: z.number().int().positive().optional(),
-  program_type: z.enum(['teen', 'adult', 'both']).optional(),
-  is_active: z.boolean().optional(),
+  instructor_id: z.string().uuid().nullable().optional(),
+  scheduled_at: z.string().datetime().optional(),
+  duration_minutes: z.number().int().min(15).max(480).optional(),
+  capacity: z.number().int().positive().optional(),
+  topic: z.string().optional(),
+  location: z.string().optional(),
+  price_cents: z.number().int().min(0).optional(),
+  instructor_earning_cents: z.number().int().min(0).optional(),
+  notes: z.string().optional(),
+  status: z.enum(['scheduled', 'completed', 'cancelled']).optional(),
 })
 
 export async function PATCH(
@@ -31,7 +34,7 @@ export async function PATCH(
     .eq('id', user.id)
     .single()
 
-  if (!profile || profile.role !== 'admin') {
+  if (!profile || (profile.role !== 'admin' && profile.role !== 'instructor')) {
     return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
@@ -44,17 +47,47 @@ export async function PATCH(
     )
   }
 
+  // Instructors can only touch `status` and `notes`
+  if (profile.role === 'instructor') {
+    const allowedKeys: Array<keyof typeof parsed.data> = ['status', 'notes']
+    const submittedKeys = Object.keys(parsed.data) as Array<keyof typeof parsed.data>
+    const disallowed = submittedKeys.filter((k) => !allowedKeys.includes(k))
+    if (disallowed.length > 0) {
+      return NextResponse.json(
+        { error: `Instructors may only modify: ${allowedKeys.join(', ')}` },
+        { status: 403 }
+      )
+    }
+
+    const { data: session } = await supabase
+      .from('classroom_sessions')
+      .select('id, instructor_id')
+      .eq('id', id)
+      .single()
+    if (!session) return NextResponse.json({ error: 'Session not found' }, { status: 404 })
+
+    const { data: inst } = await supabase
+      .from('instructors')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!inst || session.instructor_id !== inst.id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+  }
+
   const adminClient = createAdminClient()
-  const { data: pkg, error } = await adminClient
-    .from('packages')
+  const { data, error } = await adminClient
+    .from('classroom_sessions')
     .update(parsed.data)
     .eq('id', id)
     .eq('school_id', profile.school_id)
-    .select()
+    .select('*')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ package: pkg })
+  return NextResponse.json({ session: data })
 }
 
 export async function DELETE(
@@ -78,7 +111,7 @@ export async function DELETE(
 
   const adminClient = createAdminClient()
   const { error } = await adminClient
-    .from('packages')
+    .from('classroom_sessions')
     .delete()
     .eq('id', id)
     .eq('school_id', profile.school_id)

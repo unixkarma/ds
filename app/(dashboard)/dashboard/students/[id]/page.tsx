@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { ChevronLeft, Mail, Phone, Calendar, FileText, Pencil, ImageIcon } from 'lucide-react'
+import { ChevronLeft, Mail, Phone, Calendar, FileText, Pencil, ImageIcon, FileBarChart } from 'lucide-react'
 
 import { getStudentById } from '@/lib/services/students'
 import { getActivePackages } from '@/lib/services/packages'
@@ -80,6 +80,12 @@ export default async function StudentDetailPage({
         </div>
         <div className="flex items-center gap-2">
           <Badge variant={statusConf.variant}>{statusConf.label}</Badge>
+          <Link href={`/dashboard/reports/student/${id}`}>
+            <Button variant="outline" size="sm">
+              <FileBarChart className="mr-2 h-3.5 w-3.5" />
+              Full report
+            </Button>
+          </Link>
           <Link href={`/dashboard/students/${id}/edit`}>
             <Button variant="outline" size="sm">
               <Pencil className="mr-2 h-3.5 w-3.5" />

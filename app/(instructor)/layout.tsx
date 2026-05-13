@@ -35,6 +35,23 @@ export default async function InstructorLayout({ children }: { children: ReactNo
 
   const schoolName = (school as unknown as { name: string } | null)?.name ?? 'HelixDriving'
 
+  // Show the Classroom nav link only when the instructor has at least one
+  // assigned classroom session.
+  const { data: instructor } = await supabase
+    .from('instructors')
+    .select('id')
+    .eq('user_id', user.id)
+    .single()
+
+  let hasClassroomSessions = false
+  if (instructor) {
+    const { count } = await supabase
+      .from('classroom_sessions')
+      .select('id', { count: 'exact', head: true })
+      .eq('instructor_id', (instructor as { id: string }).id)
+    hasClassroomSessions = (count ?? 0) > 0
+  }
+
   return (
     <div className="min-h-screen bg-muted/30">
       <InstructorHeader
@@ -44,6 +61,7 @@ export default async function InstructorLayout({ children }: { children: ReactNo
           email: profile.email,
         }}
         schoolName={schoolName}
+        hasClassroomSessions={hasClassroomSessions}
       />
       <main className="max-w-5xl mx-auto px-4 py-8">
         {children}

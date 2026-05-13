@@ -7,6 +7,7 @@ import { RevenueReport } from './revenue-report'
 import { StudentProgressReport } from './student-progress-report'
 import { InstructorWorkloadReport } from './instructor-workload-report'
 import { InstructorPayrollReport } from './instructor-payroll-report'
+import { ClassroomReport } from './classroom-report'
 
 interface ReportsClientProps {
   data: ReportsData
@@ -15,8 +16,9 @@ interface ReportsClientProps {
 export function ReportsClient({ data }: ReportsClientProps) {
   return (
     <Tabs defaultValue="lessons">
-      <TabsList className="grid grid-cols-5 w-full max-w-3xl">
+      <TabsList className="grid grid-cols-6 w-full max-w-3xl">
         <TabsTrigger value="lessons">Lessons</TabsTrigger>
+        <TabsTrigger value="classroom">Classroom</TabsTrigger>
         <TabsTrigger value="revenue">Revenue</TabsTrigger>
         <TabsTrigger value="students">Students</TabsTrigger>
         <TabsTrigger value="instructors">Workload</TabsTrigger>
@@ -25,6 +27,10 @@ export function ReportsClient({ data }: ReportsClientProps) {
 
       <TabsContent value="lessons" className="mt-6">
         <LessonsReport lessons={data.lessons} instructors={data.instructors} />
+      </TabsContent>
+
+      <TabsContent value="classroom" className="mt-6">
+        <ClassroomReport sessions={data.classroomSessions} />
       </TabsContent>
 
       <TabsContent value="revenue" className="mt-6">
