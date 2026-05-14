@@ -7,6 +7,7 @@ import type {
   LessonWithRelations,
   StudentLedgerEntry,
   StudentPurchase,
+  ClassroomSessionWithRelations,
 } from '@/types'
 
 export interface StudentPortalData {
@@ -17,6 +18,14 @@ export interface StudentPortalData {
   balanceCents: number
   ledger: StudentLedgerEntry[]
   purchases: StudentPurchase[]
+  classroomRequired: number
+}
+
+export interface StudentClassroomData {
+  upcoming: ClassroomSessionWithRelations[]
+  past: ClassroomSessionWithRelations[]
+  totalRequired: number
+  totalAttended: number
 }
 
 export async function getStudentPortalData(): Promise<StudentPortalData | null> {
@@ -89,6 +98,12 @@ export async function getStudentPortalData(): Promise<StudentPortalData | null> 
     .eq('student_id', student.id)
     .order('created_at', { ascending: false })
 
+  const classroomRequired = (purchases ?? []).reduce(
+    (sum, row: { classroom_required?: number | null }) =>
+      sum + Number(row.classroom_required ?? 0),
+    0
+  )
+
   return {
     student: student as unknown as StudentWithUser,
     upcomingLessons: (upcoming ?? []) as unknown as LessonWithRelations[],
@@ -97,5 +112,101 @@ export async function getStudentPortalData(): Promise<StudentPortalData | null> 
     balanceCents,
     ledger: (ledger ?? []) as unknown as StudentLedgerEntry[],
     purchases: (purchases ?? []) as unknown as StudentPurchase[],
+    classroomRequired,
+  }
+}
+
+// Lightweight signal for layout/nav: does the student have any classroom obligation
+// (purchased classroom hours) OR enrollment (admin manually added them)?
+export async function studentHasClassroom(): Promise<boolean> {
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return false
+
+  const { data: student } = await supabase
+    .from('students')
+    .select('id')
+    .eq('user_id', user.id)
+    .single()
+  if (!student) return false
+
+  const studentId = (student as { id: string }).id
+
+  const [enrolledRes, requiredRes] = await Promise.all([
+    supabase
+      .from('classroom_attendance')
+      .select('id', { count: 'exact', head: true })
+      .eq('student_id', studentId),
+    supabase
+      .from('student_purchases')
+      .select('id', { count: 'exact', head: true })
+      .eq('student_id', studentId)
+      .gt('classroom_required', 0),
+  ])
+
+  return (enrolledRes.count ?? 0) > 0 || (requiredRes.count ?? 0) > 0
+}
+
+// Fetches classroom sessions the current student is enrolled in.
+// RLS filters: students can only SELECT sessions where they have an attendance row,
+// and only their own row from classroom_attendance.
+export async function getStudentClassroomData(): Promise<StudentClassroomData | null> {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) return null
+
+  const { data: student } = await supabase
+    .from('students')
+    .select('id, classroom_sessions_attended')
+    .eq('user_id', user.id)
+    .single()
+  if (!student) return null
+
+  const { data: purchases } = await supabase
+    .from('student_purchases')
+    .select('classroom_required')
+    .eq('student_id', (student as { id: string }).id)
+
+  const totalRequired = (purchases ?? []).reduce(
+    (sum, row: { classroom_required?: number | null }) =>
+      sum + Number(row.classroom_required ?? 0),
+    0
+  )
+
+  const sessionSelect = `
+    *,
+    instructor:instructors(*, user:users(*)),
+    attendance:classroom_attendance(*, student:students(*, user:users!user_id(*)))
+  `
+
+  const { data: sessions } = await supabase
+    .from('classroom_sessions')
+    .select(sessionSelect)
+    .order('scheduled_at', { ascending: true })
+
+  const all = (sessions ?? []) as unknown as ClassroomSessionWithRelations[]
+  const now = new Date()
+  const upcoming = all.filter(
+    s => new Date(s.scheduled_at) >= now && s.status === 'scheduled'
+  )
+  const past = all
+    .filter(s => new Date(s.scheduled_at) < now || s.status !== 'scheduled')
+    .sort(
+      (a, b) =>
+        new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime()
+    )
+
+  return {
+    upcoming,
+    past,
+    totalRequired,
+    totalAttended:
+      (student as { classroom_sessions_attended: number | null })
+        .classroom_sessions_attended ?? 0,
   }
 }

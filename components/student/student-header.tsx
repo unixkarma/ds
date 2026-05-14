@@ -24,16 +24,25 @@ interface StudentHeaderProps {
     email: string
   }
   schoolName: string
+  hasClassroom?: boolean
 }
 
-const navLinks = [
+const baseNavLinks = [
   { href: '/student', label: 'Dashboard', exact: true },
   { href: '/student/book', label: 'Book a Lesson' },
   { href: '/student/packages', label: 'Buy Lessons' },
   { href: '/student/account', label: 'Account' },
 ]
 
-export function StudentHeader({ user, schoolName }: StudentHeaderProps) {
+export function StudentHeader({ user, schoolName, hasClassroom = false }: StudentHeaderProps) {
+  const navLinks = hasClassroom
+    ? [
+        ...baseNavLinks.slice(0, 2),
+        { href: '/student/classroom', label: 'Classroom' },
+        ...baseNavLinks.slice(2),
+      ]
+    : baseNavLinks
+
   const router = useRouter()
   const pathname = usePathname()
 
