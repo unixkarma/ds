@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation'
 import { type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/server'
 import { StudentHeader } from '@/components/student/student-header'
+import { studentHasClassroom } from '@/lib/services/student-portal'
 
 export default async function StudentLayout({ children }: { children: ReactNode }) {
   const supabase = await createClient()
@@ -35,6 +36,7 @@ export default async function StudentLayout({ children }: { children: ReactNode 
     .single()
 
   const schoolName = (school as unknown as { name: string } | null)?.name ?? 'HelixDriving'
+  const hasClassroom = await studentHasClassroom()
 
   return (
     <div className="min-h-screen bg-muted/30">
@@ -45,6 +47,7 @@ export default async function StudentLayout({ children }: { children: ReactNode 
           email: profile.email,
         }}
         schoolName={schoolName}
+        hasClassroom={hasClassroom}
       />
       <main className="max-w-4xl mx-auto px-4 py-8">
         {children}

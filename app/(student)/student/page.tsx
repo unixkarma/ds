@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { format } from 'date-fns'
-import { AlertTriangle, CalendarDays, CheckCircle, Clock, BookOpen, Wallet } from 'lucide-react'
+import { AlertTriangle, CalendarDays, CheckCircle, Clock, BookOpen, Wallet, GraduationCap } from 'lucide-react'
+import Link from 'next/link'
 
 import { getStudentPortalData } from '@/lib/services/student-portal'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,8 +24,10 @@ export default async function StudentPortalPage() {
 
   if (!data) redirect('/login')
 
-  const { student, upcomingLessons, recentLessons, balanceCents, ledger, purchases } = data
+  const { student, upcomingLessons, recentLessons, balanceCents, ledger, purchases, classroomRequired } = data
   const lessonsRemaining = student.lessons_remaining ?? 0
+  const classroomAttended = student.classroom_sessions_attended ?? 0
+  const classroomRemaining = Math.max(classroomRequired - classroomAttended, 0)
 
   return (
     <div className="space-y-8">
@@ -98,6 +101,28 @@ export default async function StudentPortalPage() {
           </CardContent>
         </Card>
       ) : null}
+
+      {/* Classroom progress (only if student has classroom hours required) */}
+      {classroomRequired > 0 && (
+        <Card>
+          <CardContent className="pt-5 pb-5 flex items-center gap-4">
+            <GraduationCap className="h-6 w-6 text-blue-500 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium">Classroom Progress</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {classroomAttended} of {classroomRequired} hours attended
+                {classroomRemaining > 0 && ` · ${classroomRemaining} remaining`}
+              </p>
+            </div>
+            <Link
+              href="/student/classroom"
+              className="text-2xl font-bold tabular-nums shrink-0 hover:text-blue-500 transition-colors"
+            >
+              {classroomAttended}/{classroomRequired}
+            </Link>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Permit photo upload */}
       <PermitUpload
