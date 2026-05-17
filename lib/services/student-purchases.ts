@@ -49,6 +49,7 @@ export interface CreatePurchaseArgs {
   amountPaidCents: number
   discountCents?: number
   classroomRequired?: number
+  requirements?: string | null
 }
 
 // Inserts a new purchase row and returns the number of lessons that should
@@ -68,6 +69,7 @@ export async function createPurchase(args: CreatePurchaseArgs): Promise<{
     amountPaidCents,
     discountCents = 0,
     classroomRequired = 0,
+    requirements = null,
   } = args
 
   const effectivePrice = priceCents - discountCents
@@ -86,6 +88,7 @@ export async function createPurchase(args: CreatePurchaseArgs): Promise<{
       discount_cents: discountCents,
       amount_paid_cents: amountPaidCents,
       classroom_required: classroomRequired,
+      requirements,
     })
     .select('id')
     .single()

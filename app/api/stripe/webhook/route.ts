@@ -8,6 +8,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { createStripeClient } from '@/lib/stripe'
 import { creditLessonsForPayment } from '@/lib/services/payments'
 import { createPurchase } from '@/lib/services/student-purchases'
+import { notifyPackagePurchase } from '@/lib/email/send-package-confirmation'
 
 export async function POST(request: NextRequest) {
   const payload = await request.text()
@@ -112,14 +113,16 @@ export async function POST(request: NextRequest) {
     // row records the full price as paid and activates all lessons.
     let packageName = 'Single Lesson'
     let classroomRequired = 0
+    let requirements: string | null = null
     if (packageId) {
       const { data: pkg } = await adminClient
         .from('packages')
-        .select('name, classroom_required')
+        .select('name, classroom_required, requirements')
         .eq('id', packageId)
         .single()
       if (pkg?.name) packageName = pkg.name
       classroomRequired = pkg?.classroom_required ?? 0
+      requirements = pkg?.requirements ?? null
     }
 
     await createPurchase({
@@ -132,6 +135,7 @@ export async function POST(request: NextRequest) {
       priceCents: amountCents,
       amountPaidCents: amountCents,
       classroomRequired,
+      requirements,
     })
 
     await creditLessonsForPayment({
@@ -145,6 +149,22 @@ export async function POST(request: NextRequest) {
       cardBrand,
       cardLast4,
       stripePaymentIntentId: completedSession.payment_intent ?? null,
+      receiptUrl,
+    })
+
+    // Fire-and-forget confirmation email. Paid in full → all lessons activated.
+    void notifyPackagePurchase({
+      client: adminClient,
+      schoolId,
+      studentId,
+      packageName,
+      lessonCount,
+      classroomRequired,
+      pricePaidCents: amountCents,
+      totalPriceCents: amountCents,
+      discountCents: 0,
+      lessonsActivated: lessonCount,
+      requirements,
       receiptUrl,
     })
   }

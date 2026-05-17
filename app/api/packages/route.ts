@@ -9,6 +9,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 const createSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string().default(''),
+  requirements: z.string().max(2000).nullable().optional(),
   lesson_count: z.number().int().nonnegative(),
   classroom_required: z.number().int().nonnegative().default(0),
   price_cents: z.number().int().positive(),

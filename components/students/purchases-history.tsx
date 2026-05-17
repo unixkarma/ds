@@ -46,10 +46,22 @@ export function PurchasesHistory({ purchases }: PurchasesHistoryProps) {
 
             return (
               <tr key={p.id}>
-                <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap">
+                <td className="py-3 pr-4 text-muted-foreground whitespace-nowrap align-top">
                   {format(new Date(p.created_at), 'MMM d, yyyy')}
                 </td>
-                <td className="py-3 pr-4 font-medium">{p.package_name}</td>
+                <td className="py-3 pr-4 font-medium align-top">
+                  {p.package_name}
+                  {p.requirements && (
+                    <details className="mt-1">
+                      <summary className="text-xs text-amber-700 font-normal cursor-pointer hover:underline">
+                        View requirements
+                      </summary>
+                      <p className="mt-1 text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed max-w-md">
+                        {p.requirements}
+                      </p>
+                    </details>
+                  )}
+                </td>
                 <td className="py-3 pr-4 text-center tabular-nums">
                   <span
                     className={cn(

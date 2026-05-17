@@ -9,6 +9,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 const patchSchema = z.object({
   name: z.string().min(1).optional(),
   description: z.string().optional(),
+  requirements: z.string().max(2000).nullable().optional(),
   lesson_count: z.number().int().nonnegative().optional(),
   classroom_required: z.number().int().nonnegative().optional(),
   price_cents: z.number().int().positive().optional(),
