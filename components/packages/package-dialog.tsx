@@ -28,6 +28,7 @@ import type { Package, ProgramType } from '@/types'
 const packageSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   description: z.string(),
+  requirements: z.string().max(2000),
   lesson_count: z.string().min(1, 'Lesson count is required'),
   classroom_required: z.string(),
   price_cents: z.string().min(1, 'Price is required'),
@@ -51,6 +52,7 @@ export function PackageDialog({ open, onOpenChange, pkg, onSaved }: PackageDialo
     defaultValues: {
       name: '',
       description: '',
+      requirements: '',
       lesson_count: '',
       classroom_required: '0',
       price_cents: '',
@@ -63,6 +65,7 @@ export function PackageDialog({ open, onOpenChange, pkg, onSaved }: PackageDialo
       form.reset({
         name: pkg.name,
         description: pkg.description,
+        requirements: pkg.requirements ?? '',
         lesson_count: String(pkg.lesson_count),
         classroom_required: String(pkg.classroom_required ?? 0),
         price_cents: String(pkg.price_cents),
@@ -72,6 +75,7 @@ export function PackageDialog({ open, onOpenChange, pkg, onSaved }: PackageDialo
       form.reset({
         name: '',
         description: '',
+        requirements: '',
         lesson_count: '',
         classroom_required: '0',
         price_cents: '',
@@ -84,6 +88,7 @@ export function PackageDialog({ open, onOpenChange, pkg, onSaved }: PackageDialo
     const payload = {
       name: values.name,
       description: values.description,
+      requirements: values.requirements.trim() ? values.requirements.trim() : null,
       lesson_count: parseInt(values.lesson_count, 10),
       classroom_required: parseInt(values.classroom_required || '0', 10),
       price_cents: parseInt(values.price_cents, 10),
@@ -132,6 +137,19 @@ export function PackageDialog({ open, onOpenChange, pkg, onSaved }: PackageDialo
               rows={2}
               {...form.register('description')}
             />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="pkg-requirements">Requirements (optional)</Label>
+            <Textarea
+              id="pkg-requirements"
+              placeholder="Bring valid learner's permit, parent signature required, must be 15+ years old…"
+              rows={4}
+              {...form.register('requirements')}
+            />
+            <p className="text-xs text-muted-foreground">
+              Important info shown to students before purchase and included in the confirmation email.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

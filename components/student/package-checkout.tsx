@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Package, Clock } from 'lucide-react'
+import { Package, Clock, AlertCircle } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -59,13 +59,26 @@ export function PackageCheckout({ packages, singleLessonPriceCents }: PackageChe
               <CardDescription>{pkg.description}</CardDescription>
             )}
           </CardHeader>
-          <CardContent className="flex-1">
-            <p className="text-3xl font-bold">
-              ${(pkg.price_cents / 100).toFixed(2)}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              ${(pkg.price_cents / pkg.lesson_count / 100).toFixed(2)} per lesson
-            </p>
+          <CardContent className="flex-1 space-y-3">
+            <div>
+              <p className="text-3xl font-bold">
+                ${(pkg.price_cents / 100).toFixed(2)}
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                ${(pkg.price_cents / pkg.lesson_count / 100).toFixed(2)} per lesson
+              </p>
+            </div>
+            {pkg.requirements && (
+              <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-xs text-amber-900">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="font-semibold mb-1">Important — Requirements</p>
+                    <p className="whitespace-pre-wrap leading-relaxed">{pkg.requirements}</p>
+                  </div>
+                </div>
+              </div>
+            )}
           </CardContent>
           <CardFooter>
             <Button

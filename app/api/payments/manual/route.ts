@@ -23,6 +23,7 @@ import {
   bumpStudentLessons,
   createPurchase,
 } from '@/lib/services/student-purchases'
+import { notifyPackagePurchase } from '@/lib/email/send-package-confirmation'
 
 const bodySchema = z
   .object({
@@ -112,7 +113,7 @@ export async function POST(request: NextRequest) {
     if (mode === 'package') {
       const { data: pkg } = await adminClient
         .from('packages')
-        .select('id, school_id, name, lesson_count, price_cents, classroom_required')
+        .select('id, school_id, name, lesson_count, price_cents, classroom_required, requirements')
         .eq('id', packageId!)
         .eq('school_id', profile.school_id)
         .single()
@@ -142,6 +143,7 @@ export async function POST(request: NextRequest) {
         discountCents: discount,
         amountPaidCents: paid,
         classroomRequired: pkg.classroom_required ?? 0,
+        requirements: pkg.requirements ?? null,
       })
 
       // 2. Record the payment + bump lessons (only the activated portion)
@@ -175,6 +177,22 @@ export async function POST(request: NextRequest) {
           createdBy: user.id,
         })
       }
+
+      // 4. Fire-and-forget confirmation email (never blocks the response)
+      void notifyPackagePurchase({
+        client: adminClient,
+        schoolId: profile.school_id,
+        studentId,
+        packageName: pkg.name,
+        lessonCount: pkg.lesson_count,
+        classroomRequired: pkg.classroom_required ?? 0,
+        pricePaidCents: paid,
+        totalPriceCents: price,
+        discountCents: discount,
+        lessonsActivated,
+        requirements: pkg.requirements ?? null,
+        receiptUrl: null,
+      })
 
       return NextResponse.json(
         { paymentId, purchaseId, lessonsActivated, balanceCharge: owed },

@@ -181,6 +181,7 @@ export interface Package {
   school_id: string
   name: string
   description: string
+  requirements: string | null
   lesson_count: number
   classroom_required: number
   price_cents: number
@@ -221,6 +222,7 @@ export interface StudentPurchase {
   price_cents: number
   discount_cents: number         // effective price = price_cents - discount_cents
   amount_paid_cents: number
+  requirements: string | null    // snapshot of package.requirements at sale time
   created_at: string
 }
 
