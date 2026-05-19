@@ -14,6 +14,12 @@ const updateStudentSchema = z.object({
   notes: z.string().nullable().optional(),
   status: z.enum(['active', 'inactive', 'completed']).optional(),
   totalLessonsPurchased: z.number().int().min(0).optional(),
+  parent1Name: z.string().optional(),
+  parent1Phone: z.string().optional(),
+  parent1Email: z.string().email().or(z.literal('')).optional(),
+  parent2Name: z.string().optional(),
+  parent2Phone: z.string().optional(),
+  parent2Email: z.string().email().or(z.literal('')).optional(),
 })
 
 export async function PATCH(
@@ -62,6 +68,12 @@ export async function PATCH(
   if (updates.ageGroup !== undefined) studentUpdates.age_group = updates.ageGroup
   if (updates.totalLessonsPurchased !== undefined)
     studentUpdates.total_lessons_purchased = updates.totalLessonsPurchased
+  if (updates.parent1Name !== undefined) studentUpdates.parent1_name = updates.parent1Name
+  if (updates.parent1Phone !== undefined) studentUpdates.parent1_phone = updates.parent1Phone
+  if (updates.parent1Email !== undefined) studentUpdates.parent1_email = updates.parent1Email
+  if (updates.parent2Name !== undefined) studentUpdates.parent2_name = updates.parent2Name
+  if (updates.parent2Phone !== undefined) studentUpdates.parent2_phone = updates.parent2Phone
+  if (updates.parent2Email !== undefined) studentUpdates.parent2_email = updates.parent2Email
 
   // Update users table fields (name, phone, DOB)
   const userUpdates: Record<string, unknown> = {}
