@@ -83,6 +83,12 @@ export interface Student {
   emergency_contact_name: string
   emergency_contact_phone: string
   emergency_contact_relationship: string
+  parent1_name: string
+  parent1_phone: string
+  parent1_email: string
+  parent2_name: string
+  parent2_phone: string
+  parent2_email: string
   road_test_status: string
   wears_glasses_contacts: string
   medical_conditions: string

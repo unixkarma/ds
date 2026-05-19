@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -40,6 +40,12 @@ const studentFormSchema = z.object({
   dateOfBirth: z.string().min(1, 'Date of birth is required'),
   ageGroup: z.enum(['teen', 'adult']),
   notes: z.string(),
+  parent1Name: z.string(),
+  parent1Phone: z.string(),
+  parent1Email: z.string(),
+  parent2Name: z.string(),
+  parent2Phone: z.string(),
+  parent2Email: z.string(),
 })
 
 type StudentFormValues = z.infer<typeof studentFormSchema>
@@ -56,6 +62,22 @@ export function StudentForm({ student }: StudentFormProps) {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
 
+  // Under 18 at signup = teen, 18+ = adult. Returns null for empty/invalid input.
+  function ageGroupFromDob(dob: string): 'teen' | 'adult' | null {
+    if (!dob) return null
+    const d = new Date(dob)
+    if (isNaN(d.getTime())) return null
+    const today = new Date()
+    let age = today.getFullYear() - d.getFullYear()
+    const m = today.getMonth() - d.getMonth()
+    if (m < 0 || (m === 0 && today.getDate() < d.getDate())) age--
+    return age < 18 ? 'teen' : 'adult'
+  }
+
+  const initialDob = student?.user.date_of_birth ?? ''
+  const initialAgeGroup =
+    student?.age_group ?? ageGroupFromDob(initialDob) ?? 'adult'
+
   const form = useForm<StudentFormValues>({
     resolver: zodResolver(studentFormSchema),
     defaultValues: {
@@ -64,11 +86,26 @@ export function StudentForm({ student }: StudentFormProps) {
       email: '',
       password: '',
       phone: student?.user.phone ?? '',
-      dateOfBirth: student?.user.date_of_birth ?? '',
-      ageGroup: student?.age_group ?? 'adult',
+      dateOfBirth: initialDob,
+      ageGroup: initialAgeGroup,
       notes: student?.notes ?? '',
+      parent1Name: student?.parent1_name ?? '',
+      parent1Phone: student?.parent1_phone ?? '',
+      parent1Email: student?.parent1_email ?? '',
+      parent2Name: student?.parent2_name ?? '',
+      parent2Phone: student?.parent2_phone ?? '',
+      parent2Email: student?.parent2_email ?? '',
     },
   })
+
+  // Auto-select teen/adult when DOB changes. User can still override manually.
+  const watchedDob = form.watch('dateOfBirth')
+  useEffect(() => {
+    const detected = ageGroupFromDob(watchedDob)
+    if (detected && form.getValues('ageGroup') !== detected) {
+      form.setValue('ageGroup', detected, { shouldDirty: true })
+    }
+  }, [watchedDob, form])
 
   async function onSubmit(values: StudentFormValues) {
     // Extra validation: email is required in create mode
@@ -88,6 +125,24 @@ export function StudentForm({ student }: StudentFormProps) {
       }
     }
 
+    // At least one parent/emergency phone is required (matches DB constraint)
+    if (!values.parent1Phone.trim() && !values.parent2Phone.trim()) {
+      form.setError('parent1Phone', {
+        message: 'At least one parent/emergency contact phone is required',
+      })
+      return
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (values.parent1Email.trim() && !emailRegex.test(values.parent1Email)) {
+      form.setError('parent1Email', { message: 'Invalid email' })
+      return
+    }
+    if (values.parent2Email.trim() && !emailRegex.test(values.parent2Email)) {
+      form.setError('parent2Email', { message: 'Invalid email' })
+      return
+    }
+
     setIsLoading(true)
     setError(null)
 
@@ -105,6 +160,12 @@ export function StudentForm({ student }: StudentFormProps) {
             dateOfBirth: values.dateOfBirth || null,
             ageGroup: values.ageGroup,
             notes: values.notes || null,
+            parent1Name: values.parent1Name,
+            parent1Phone: values.parent1Phone,
+            parent1Email: values.parent1Email,
+            parent2Name: values.parent2Name,
+            parent2Phone: values.parent2Phone,
+            parent2Email: values.parent2Email,
           }),
         })
       } else {
@@ -259,12 +320,112 @@ export function StudentForm({ student }: StudentFormProps) {
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">
-                Teens see only teen + universal packages. Adults see only adult + universal.
+                Auto-selected from Date of Birth (under 18 = Teen). Override if needed. Teens see only teen + universal packages.
               </p>
               <FormMessage />
             </FormItem>
           )}
         />
+
+        {/* Parent / Emergency Contact */}
+        <div className="border rounded-md p-4 space-y-4 bg-muted/30">
+          <div>
+            <h3 className="font-medium text-sm">Parent / Emergency Contact</h3>
+            <p className="text-xs text-muted-foreground mt-1">
+              At least one phone number is required. For teen students, parent details are mandatory.
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-muted-foreground">Contact 1</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <FormField
+                control={form.control}
+                name="parent1Name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="John Doe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="parent1Phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">Phone *</FormLabel>
+                    <FormControl>
+                      <Input type="tel" placeholder="+1 555 000 0000" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="parent1Email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="parent@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <p className="text-xs font-medium text-muted-foreground">Contact 2 (optional)</p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <FormField
+                control={form.control}
+                name="parent2Name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Jane Doe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="parent2Phone"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">Phone</FormLabel>
+                    <FormControl>
+                      <Input type="tel" placeholder="+1 555 000 0000" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="parent2Email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-xs">Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="parent@example.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+          </div>
+        </div>
 
         {/* Notes */}
         <FormField

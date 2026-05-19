@@ -9,16 +9,27 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-const createStudentSchema = z.object({
-  firstName: z.string().min(1),
-  lastName: z.string().min(1),
-  email: z.string().email(),
-  password: z.string().min(6),
-  phone: z.string().min(1, 'Phone is required'),
-  dateOfBirth: z.string().min(1, 'Date of birth is required'),
-  ageGroup: z.enum(['teen', 'adult']).default('adult'),
-  notes: z.string().optional().nullable(),
-})
+const createStudentSchema = z
+  .object({
+    firstName: z.string().min(1),
+    lastName: z.string().min(1),
+    email: z.string().email(),
+    password: z.string().min(6),
+    phone: z.string().min(1, 'Phone is required'),
+    dateOfBirth: z.string().min(1, 'Date of birth is required'),
+    ageGroup: z.enum(['teen', 'adult']).default('adult'),
+    notes: z.string().optional().nullable(),
+    parent1Name: z.string().optional().nullable(),
+    parent1Phone: z.string().optional().nullable(),
+    parent1Email: z.string().email().or(z.literal('')).optional().nullable(),
+    parent2Name: z.string().optional().nullable(),
+    parent2Phone: z.string().optional().nullable(),
+    parent2Email: z.string().email().or(z.literal('')).optional().nullable(),
+  })
+  .refine((d) => (d.parent1Phone?.trim() ?? '') !== '' || (d.parent2Phone?.trim() ?? '') !== '', {
+    message: 'At least one parent/emergency contact phone is required',
+    path: ['parent1Phone'],
+  })
 
 export async function POST(request: NextRequest) {
   // 1. Verify the caller is an authenticated admin
@@ -52,7 +63,22 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { firstName, lastName, email, password, phone, dateOfBirth, ageGroup, notes } = parsed.data
+  const {
+    firstName,
+    lastName,
+    email,
+    password,
+    phone,
+    dateOfBirth,
+    ageGroup,
+    notes,
+    parent1Name,
+    parent1Phone,
+    parent1Email,
+    parent2Name,
+    parent2Phone,
+    parent2Email,
+  } = parsed.data
   const schoolId = profile.school_id
 
   const adminClient = createAdminClient()
@@ -98,6 +124,12 @@ export async function POST(request: NextRequest) {
       school_id: schoolId,
       age_group: ageGroup,
       notes: notes ?? null,
+      parent1_name: parent1Name ?? '',
+      parent1_phone: parent1Phone ?? '',
+      parent1_email: parent1Email ?? '',
+      parent2_name: parent2Name ?? '',
+      parent2_phone: parent2Phone ?? '',
+      parent2_email: parent2Email ?? '',
     })
     .select('*, user:users!user_id(*)')
     .single()
