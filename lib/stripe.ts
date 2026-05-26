@@ -16,3 +16,12 @@ export function formatStripeCents(cents: number, currency = 'usd'): string {
     currency: currency.toUpperCase(),
   }).format(cents / 100)
 }
+
+// Re-export the surcharge helpers from the side-effect-free module so server
+// code can keep importing from '@/lib/stripe' without pulling Stripe SDK
+// into client bundles that only need the constants.
+export {
+  CARD_SURCHARGE_RATE,
+  applyCardSurcharge,
+  type SurchargeBreakdown,
+} from './surcharge'

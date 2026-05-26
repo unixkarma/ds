@@ -6,7 +6,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { createStripeClient } from '@/lib/stripe'
+import { applyCardSurcharge, createStripeClient } from '@/lib/stripe'
 
 const bodySchema = z.object({
   // Either a package_id OR 'single_lesson'
@@ -100,6 +100,12 @@ export async function POST(request: NextRequest) {
   const successUrl = `${origin}/student/packages?success=1&session_id={CHECKOUT_SESSION_ID}`
   const cancelUrl = `${origin}/student/packages?cancelled=1`
 
+  // Pass the 3% card processing fee through to the student as a separate
+  // line item — Stripe's hosted checkout will show the breakdown clearly.
+  // metadata.amount_cents keeps the BASE package price so the purchase row
+  // is recorded at list price; the surcharge is implicit in the gross.
+  const { surchargeCents, totalCents } = applyCardSurcharge(amountCents)
+
   const stripe = createStripeClient(school.stripe_secret_key)
 
   const session = await stripe.checkout.sessions.create({
@@ -113,6 +119,14 @@ export async function POST(request: NextRequest) {
         },
         quantity: 1,
       },
+      {
+        price_data: {
+          currency: 'usd',
+          unit_amount: surchargeCents,
+          product_data: { name: 'Credit card processing fee (3%)' },
+        },
+        quantity: 1,
+      },
     ],
     success_url: successUrl,
     cancel_url: cancelUrl,
@@ -122,6 +136,8 @@ export async function POST(request: NextRequest) {
       package_id: packageId ?? '',
       lesson_count: String(lessonCount),
       amount_cents: String(amountCents),
+      surcharge_cents: String(surchargeCents),
+      total_cents: String(totalCents),
     },
   })
 
