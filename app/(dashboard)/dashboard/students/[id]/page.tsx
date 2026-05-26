@@ -18,6 +18,7 @@ import { Separator } from '@/components/ui/separator'
 import { StudentStatusToggle } from '@/components/students/student-status-toggle'
 import { RecordPaymentDialog } from '@/components/students/record-payment-dialog'
 import { AdjustBalanceDialog } from '@/components/students/adjust-balance-dialog'
+import { SendPaymentLinkDialog } from '@/components/students/send-payment-link-dialog'
 import { LedgerHistory } from '@/components/students/ledger-history'
 import { PurchasesHistory } from '@/components/students/purchases-history'
 import type { StudentStatus, LessonStatus } from '@/types'
@@ -195,6 +196,11 @@ export default async function StudentDetailPage({
                 <RecordPaymentDialog
                   studentId={student.id}
                   studentAgeGroup={student.age_group}
+                  packages={packages}
+                  currentBalanceCents={balanceCents}
+                />
+                <SendPaymentLinkDialog
+                  studentId={student.id}
                   packages={packages}
                   currentBalanceCents={balanceCents}
                 />

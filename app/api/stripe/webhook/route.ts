@@ -1,13 +1,21 @@
 // POST /api/stripe/webhook
 // Handles Stripe webhook events for the school's Stripe account.
-// Event: checkout.session.completed → credit lessons_remaining + record payment
+// Event: checkout.session.completed
+//   mode='package' (default): credit lessons_remaining + record payment + create purchase row
+//   mode='balance':            apply payment to outstanding purchases (oldest first),
+//                              record payment, ledger entry, bump lessons
 
 import { NextResponse, type NextRequest } from 'next/server'
 import type Stripe from 'stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createStripeClient } from '@/lib/stripe'
 import { creditLessonsForPayment } from '@/lib/services/payments'
-import { createPurchase } from '@/lib/services/student-purchases'
+import {
+  applyPaymentToPurchases,
+  bumpStudentLessons,
+  createPurchase,
+} from '@/lib/services/student-purchases'
+import { insertLedgerEntry } from '@/lib/services/student-ledger'
 import { notifyPackagePurchase } from '@/lib/email/send-package-confirmation'
 
 export async function POST(request: NextRequest) {
@@ -71,12 +79,16 @@ export async function POST(request: NextRequest) {
     }
 
     const meta = completedSession.metadata
+    // Default to 'package' for any legacy session that predates the balance mode.
+    const mode = (meta.mode === 'balance' ? 'balance' : 'package') as 'package' | 'balance'
     const studentId = meta.student_id
-    const packageId = meta.package_id || null
-    const lessonCount = parseInt(meta.lesson_count, 10)
     const amountCents = parseInt(meta.amount_cents, 10)
+    const surchargeCentsRaw = parseInt(meta.surcharge_cents ?? '0', 10)
+    const surchargeCents = isNaN(surchargeCentsRaw) ? 0 : surchargeCentsRaw
+    // Stripe `amount_total` is the gross actually charged (base + fee).
+    const grossAmountCents = completedSession.amount_total ?? (amountCents + surchargeCents)
 
-    if (!studentId || isNaN(lessonCount)) {
+    if (!studentId || isNaN(amountCents)) {
       return NextResponse.json({ error: 'Missing metadata' }, { status: 400 })
     }
 
@@ -107,6 +119,68 @@ export async function POST(request: NextRequest) {
       } catch {
         // Non-fatal: keep going with nulls so we still record the sale.
       }
+    }
+
+    // ── Balance payment: pay down outstanding purchases ─────────────
+    if (mode === 'balance') {
+      // Idempotency: the payment row is inserted first with the Stripe
+      // payment_intent_id (UNIQUE). On a Stripe retry the insert returns
+      // 23505 — we skip the rest so nothing double-applies.
+      const apply = await applyPaymentToPurchases(adminClient, studentId, amountCents)
+      const saleDate = apply.oldestSaleDate ?? new Date().toISOString()
+
+      const { data: payment, error: paymentError } = await adminClient
+        .from('payments')
+        .insert({
+          school_id: schoolId,
+          student_id: studentId,
+          package_id: null,
+          stripe_payment_intent_id: completedSession.payment_intent,
+          amount_cents: grossAmountCents,
+          status: 'completed',
+          payment_method: paymentMethodType,
+          card_brand: cardBrand,
+          card_last4: cardLast4,
+          receipt_url: receiptUrl,
+          description: 'Balance payment (card)',
+          sale_date: saleDate,
+        })
+        .select('id')
+        .single()
+
+      // 23505 = unique_violation → Stripe retry, already processed.
+      if (paymentError) {
+        const code = (paymentError as { code?: string }).code
+        if (code === '23505') {
+          return NextResponse.json({ received: true, duplicate: true })
+        }
+        return NextResponse.json({ error: paymentError.message }, { status: 500 })
+      }
+
+      await insertLedgerEntry({
+        client: adminClient,
+        schoolId,
+        studentId,
+        amountCents: -amountCents,
+        entryType: 'payment',
+        description: 'Balance payment (card)',
+        paymentMethod: 'stripe',
+        paymentId: payment!.id,
+      })
+
+      if (apply.lessonsUnlocked > 0) {
+        await bumpStudentLessons(adminClient, studentId, apply.lessonsUnlocked)
+      }
+
+      return NextResponse.json({ received: true })
+    }
+
+    // ── Package purchase: existing flow ─────────────────────────────
+    const packageId = meta.package_id || null
+    const lessonCount = parseInt(meta.lesson_count, 10)
+
+    if (isNaN(lessonCount)) {
+      return NextResponse.json({ error: 'Missing lesson_count' }, { status: 400 })
     }
 
     // Stripe Checkout is always paid in full at sale time, so the purchase
@@ -144,7 +218,9 @@ export async function POST(request: NextRequest) {
       studentId,
       packageId,
       lessonCount,
-      amountCents,
+      // Record the GROSS (base + card surcharge) so revenue reports match
+      // what Stripe actually deposited.
+      amountCents: grossAmountCents,
       paymentMethod: paymentMethodType,
       cardBrand,
       cardLast4,
@@ -163,6 +239,7 @@ export async function POST(request: NextRequest) {
       pricePaidCents: amountCents,
       totalPriceCents: amountCents,
       discountCents: 0,
+      surchargeCents,
       lessonsActivated: lessonCount,
       requirements,
       receiptUrl,

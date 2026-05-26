@@ -16,6 +16,9 @@ export interface PackageConfirmationArgs {
   pricePaidCents: number
   totalPriceCents: number
   discountCents: number
+  // Card-processing surcharge passed through on Stripe sales. 0 for
+  // cash/check/other and for any legacy Stripe sale predating the fee.
+  surchargeCents?: number
   lessonsActivated: number
   requirements: string | null
   receiptUrl: string | null
@@ -82,6 +85,12 @@ function buildHtml(args: PackageConfirmationArgs): string {
     ? `<tr><td style="padding: 4px 0; color: #6b7280;">Discount</td><td style="padding: 4px 0; text-align: right; color: #059669;">−${fmt(discountCents)}</td></tr>`
     : ''
 
+  const surchargeCents = args.surchargeCents ?? 0
+  const surchargeRow = surchargeCents > 0
+    ? `<tr><td style="padding: 4px 0; color: #6b7280;">Card processing fee (3%)</td><td style="padding: 4px 0; text-align: right;">${fmt(surchargeCents)}</td></tr>
+       <tr><td style="padding: 4px 0; color: #6b7280; border-top: 1px solid #e5e7eb;">Total charged</td><td style="padding: 4px 0; text-align: right; font-weight: 700; border-top: 1px solid #e5e7eb;">${fmt(pricePaidCents + surchargeCents)}</td></tr>`
+    : ''
+
   const classroomRow = classroomRequired > 0
     ? `<tr><td style="padding: 4px 0; color: #6b7280;">Classroom hours required</td><td style="padding: 4px 0; text-align: right;">${classroomRequired}</td></tr>`
     : ''
@@ -119,6 +128,7 @@ function buildHtml(args: PackageConfirmationArgs): string {
             <tr><td style="padding: 4px 0; color: #6b7280;">Price</td><td style="padding: 4px 0; text-align: right;">${fmt(totalPriceCents)}</td></tr>
             ${discountRow}
             <tr><td style="padding: 4px 0; color: #6b7280;">Paid now</td><td style="padding: 4px 0; text-align: right; font-weight: 700;">${fmt(pricePaidCents)}</td></tr>
+            ${surchargeRow}
             <tr><td style="padding: 4px 0; color: #6b7280;">Lessons activated</td><td style="padding: 4px 0; text-align: right; font-weight: 700;">${lessonsActivated} / ${lessonCount}</td></tr>
           </table>
         </div>
@@ -155,6 +165,11 @@ function buildText(args: PackageConfirmationArgs): string {
   lines.push(`Price: ${fmt(args.totalPriceCents)}`)
   if (args.discountCents > 0) lines.push(`Discount: -${fmt(args.discountCents)}`)
   lines.push(`Paid now: ${fmt(args.pricePaidCents)}`)
+  const surchargeCents = args.surchargeCents ?? 0
+  if (surchargeCents > 0) {
+    lines.push(`Card processing fee (3%): ${fmt(surchargeCents)}`)
+    lines.push(`Total charged: ${fmt(args.pricePaidCents + surchargeCents)}`)
+  }
   lines.push(`Lessons activated: ${args.lessonsActivated} / ${args.lessonCount}`)
   if (owed > 0) {
     lines.push('', `Outstanding balance: ${fmt(owed)}`)
@@ -208,6 +223,7 @@ export interface NotifyPurchaseArgs {
   pricePaidCents: number
   totalPriceCents: number
   discountCents: number
+  surchargeCents?: number
   lessonsActivated: number
   requirements: string | null
   receiptUrl: string | null
@@ -244,6 +260,7 @@ export async function notifyPackagePurchase(args: NotifyPurchaseArgs): Promise<v
       pricePaidCents: args.pricePaidCents,
       totalPriceCents: args.totalPriceCents,
       discountCents: args.discountCents,
+      surchargeCents: args.surchargeCents,
       lessonsActivated: args.lessonsActivated,
       requirements: args.requirements,
       receiptUrl: args.receiptUrl,
