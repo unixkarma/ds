@@ -3,7 +3,7 @@ import { Users, CalendarDays, DollarSign, Clock } from 'lucide-react'
 import type { Metadata } from 'next'
 
 import { getDashboardStats } from '@/lib/services/dashboard'
-import { formatCurrency, formatDateTime, getFullName } from '@/lib/utils'
+import { formatCurrency, formatDateTime, formatHours, getFullName } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -81,7 +81,7 @@ function UpcomingLessons({ stats }: { stats: DashboardStats }) {
                       {formatDateTime(lesson.scheduled_at)}
                     </td>
                     <td className="py-3">
-                      <Badge variant="secondary">{lesson.duration_minutes} min</Badge>
+                      <Badge variant="secondary">{formatHours(lesson.duration_minutes)}</Badge>
                     </td>
                   </tr>
                 ))}

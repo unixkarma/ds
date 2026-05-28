@@ -36,6 +36,12 @@ export function getInitials(user: { first_name: string; last_name: string }): st
   return `${user.first_name[0] ?? ''}${user.last_name[0] ?? ''}`.toUpperCase()
 }
 
+// Convert a duration in minutes to a display string in hours (e.g. 90 → "1.5 h", 60 → "1 h")
+export function formatHours(durationMin: number): string {
+  const hours = Math.round((durationMin / 60) * 100) / 100
+  return `${hours} h`
+}
+
 // Map day_of_week integer to label
 export const DAY_LABELS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
 
