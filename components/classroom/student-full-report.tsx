@@ -5,7 +5,7 @@ import { format } from 'date-fns'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { formatCurrency, formatDate, formatDateTime, getFullName } from '@/lib/utils'
+import { formatCurrency, formatDate, formatDateTime, formatHours, getFullName } from '@/lib/utils'
 import type { StudentFullReport } from '@/lib/services/students'
 import type { LessonStatus, ClassroomAttendanceStatus } from '@/types'
 
@@ -140,7 +140,7 @@ export function StudentFullReportView({ report }: StudentFullReportProps) {
             rows={lessons.map((l) => [
               formatDateTime(l.scheduled_at),
               getFullName(l.instructor.user),
-              `${l.duration_minutes} min`,
+              formatHours(l.duration_minutes),
               <Badge key={`${l.id}-st`} variant={LESSON_BADGE[l.status]}>
                 {l.status.replace('_', ' ')}
               </Badge>,
@@ -164,7 +164,7 @@ export function StudentFullReportView({ report }: StudentFullReportProps) {
               rows={classroomAttendance.map((r) => [
                 formatDateTime(r.session.scheduled_at),
                 r.session.topic || '—',
-                `${r.session.duration_minutes} min`,
+                formatHours(r.session.duration_minutes),
                 <Badge key={`${r.id}-st`} variant={ATTENDANCE_BADGE[r.status]}>
                   {r.status}
                 </Badge>,

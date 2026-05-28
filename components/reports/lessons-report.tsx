@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { formatDateTime, getFullName } from '@/lib/utils'
+import { formatDateTime, formatHours, getFullName } from '@/lib/utils'
 import { toCSV, downloadCSV, type CSVColumn } from '@/lib/csv'
 import type { LessonWithRelations, InstructorWithUser, LessonStatus } from '@/types'
 
@@ -71,7 +71,7 @@ export function LessonsReport({ lessons, instructors }: LessonsReportProps) {
       { header: 'Student', value: l => getFullName(l.student.user) },
       { header: 'Instructor', value: l => getFullName(l.instructor.user) },
       { header: 'Vehicle', value: l => l.vehicle ? `${l.vehicle.year} ${l.vehicle.make} ${l.vehicle.model}` : '' },
-      { header: 'Duration (min)', value: l => l.duration_minutes },
+      { header: 'Duration (h)', value: l => Math.round((l.duration_minutes / 60) * 100) / 100 },
       { header: 'Status', value: l => STATUS_LABEL[l.status] },
       { header: 'Sold By', value: l => l.sold_by ?? '' },
       { header: 'Price', value: l => (l.price_cents / 100).toFixed(2) },
@@ -224,7 +224,7 @@ export function LessonsReport({ lessons, instructors }: LessonsReportProps) {
                       : '—'}
                   </TableCell>
                   <TableCell className="text-center">
-                    <Badge variant="secondary">{lesson.duration_minutes} min</Badge>
+                    <Badge variant="secondary">{formatHours(lesson.duration_minutes)}</Badge>
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant={STATUS_BADGE[lesson.status]}>
