@@ -56,7 +56,7 @@ export function SendPaymentLinkDialog({
   const [mode, setMode] = useState<Mode>('package')
   const [packageId, setPackageId] = useState<string>(packages[0]?.id ?? '')
   const [balanceDollars, setBalanceDollars] = useState<string>('')
-  const [sendEmail, setSendEmail] = useState(true)
+  const [sendEmail, setSendEmail] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [result, setResult] = useState<GenerateResponse | null>(null)
   const [copied, setCopied] = useState(false)
@@ -69,7 +69,7 @@ export function SendPaymentLinkDialog({
       setBalanceDollars(
         currentBalanceCents > 0 ? (currentBalanceCents / 100).toFixed(2) : ''
       )
-      setSendEmail(true)
+      setSendEmail(false)
       setResult(null)
       setCopied(false)
     }
@@ -429,8 +429,8 @@ function BreakdownCard({
         <span className="font-bold text-foreground">{formatCurrency(totalCents)}</span>
       </div>
       <p className="pt-1 text-[11px] leading-relaxed">
-        The {surchargePct}% fee is added on top and shown to the student on
-        Stripe&apos;s checkout page. Link expires in 24 hours.
+        A {surchargePct}% card processing fee will be added on top and is shown to the
+        student on Stripe&apos;s checkout page. Link expires in 24 hours.
       </p>
     </div>
   )

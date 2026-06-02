@@ -382,6 +382,7 @@ function RegistrationLinkPanel({ school }: { school: School }) {
 const policiesSchema = z.object({
   student_cancellation_fee_cents: z.string(),
   instructor_cancellation_fee_cents: z.string(),
+  student_no_show_fee_cents: z.string(),
   max_booking_days_ahead: z.string(),
 })
 
@@ -396,6 +397,7 @@ function PoliciesForm({ school }: { school: School }) {
     defaultValues: {
       student_cancellation_fee_cents: String(school.student_cancellation_fee_cents / 100),
       instructor_cancellation_fee_cents: String(school.instructor_cancellation_fee_cents / 100),
+      student_no_show_fee_cents: String(school.student_no_show_fee_cents / 100),
       max_booking_days_ahead: String(school.max_booking_days_ahead),
     },
   })
@@ -410,6 +412,7 @@ function PoliciesForm({ school }: { school: School }) {
       body: JSON.stringify({
         student_cancellation_fee_cents: Math.round(parseFloat(values.student_cancellation_fee_cents) * 100) || 0,
         instructor_cancellation_fee_cents: Math.round(parseFloat(values.instructor_cancellation_fee_cents) * 100) || 0,
+        student_no_show_fee_cents: Math.round(parseFloat(values.student_no_show_fee_cents) * 100) || 0,
         max_booking_days_ahead: parseInt(values.max_booking_days_ahead, 10) || 30,
       }),
     })
@@ -451,7 +454,7 @@ function PoliciesForm({ school }: { school: School }) {
               {...form.register('student_cancellation_fee_cents')}
             />
             <p className="text-xs text-muted-foreground">
-              Charged when a student cancels a lesson.
+              Charged to the student when they cancel within 24h of the lesson.
             </p>
           </div>
 
@@ -465,7 +468,21 @@ function PoliciesForm({ school }: { school: School }) {
               {...form.register('instructor_cancellation_fee_cents')}
             />
             <p className="text-xs text-muted-foreground">
-              Deducted from instructor earnings when they cancel.
+              Deducted from instructor earnings when they cancel within 24h.
+            </p>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="student_no_show_fee">No-Show Fee ($)</Label>
+            <Input
+              id="student_no_show_fee"
+              type="number"
+              step="0.01"
+              min="0"
+              {...form.register('student_no_show_fee_cents')}
+            />
+            <p className="text-xs text-muted-foreground">
+              Charged to the student when a lesson is marked no-show. The lesson credit is kept.
             </p>
           </div>
         </div>

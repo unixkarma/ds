@@ -7,7 +7,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import type { StudentPurchase } from '@/types'
+import type { StudentPurchase, PaymentSoldBy } from '@/types'
 
 // ── Read ─────────────────────────────────────────────────────
 
@@ -50,6 +50,9 @@ export interface CreatePurchaseArgs {
   discountCents?: number
   classroomRequired?: number
   requirements?: string | null
+  soldBy?: PaymentSoldBy | null
+  recordedBy?: string | null
+  soldByInstructorId?: string | null
 }
 
 // Inserts a new purchase row and returns the number of lessons that should
@@ -70,6 +73,9 @@ export async function createPurchase(args: CreatePurchaseArgs): Promise<{
     discountCents = 0,
     classroomRequired = 0,
     requirements = null,
+    soldBy = null,
+    recordedBy = null,
+    soldByInstructorId = null,
   } = args
 
   const effectivePrice = priceCents - discountCents
@@ -89,6 +95,9 @@ export async function createPurchase(args: CreatePurchaseArgs): Promise<{
       amount_paid_cents: amountPaidCents,
       classroom_required: classroomRequired,
       requirements,
+      sold_by: soldBy,
+      recorded_by: recordedBy,
+      sold_by_instructor_id: soldByInstructorId,
     })
     .select('id')
     .single()

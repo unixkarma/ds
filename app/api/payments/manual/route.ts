@@ -36,8 +36,13 @@ const bodySchema = z
     discountCents: z.number().int().min(0).optional(),
     paymentMethod: z.enum(['cash', 'check', 'other']),
     description: z.string().max(200).nullable().optional(),
+    soldBy: z.enum(['operator', 'instructor']).optional(),
+    soldByInstructorId: z.string().uuid().optional(),
   })
   .superRefine((v, ctx) => {
+    if (v.soldBy === 'instructor' && !v.soldByInstructorId) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['soldByInstructorId'], message: 'Select the instructor who sold this' })
+    }
     if (v.mode === 'package') {
       if (!v.packageId) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['packageId'], message: 'packageId required' })
       if (!v.paymentStatus) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['paymentStatus'], message: 'paymentStatus required' })
@@ -96,6 +101,10 @@ export async function POST(request: NextRequest) {
 
   const adminClient = createAdminClient()
 
+  // Sale attribution: defaults to the operator (the admin recording it).
+  const soldBy: 'operator' | 'instructor' = parsed.data.soldBy ?? 'operator'
+  const soldByInstructorId = soldBy === 'instructor' ? parsed.data.soldByInstructorId! : null
+
   // Verify the student belongs to this school
   const { data: student } = await adminClient
     .from('students')
@@ -106,6 +115,25 @@ export async function POST(request: NextRequest) {
 
   if (!student) {
     return NextResponse.json({ error: 'Student not found' }, { status: 404 })
+  }
+
+  // Validate the credited instructor belongs to this school
+  if (soldByInstructorId) {
+    const { data: inst } = await adminClient
+      .from('instructors')
+      .select('id')
+      .eq('id', soldByInstructorId)
+      .eq('school_id', profile.school_id)
+      .single()
+    if (!inst) {
+      return NextResponse.json({ error: 'Instructor not found' }, { status: 404 })
+    }
+  }
+
+  const attribution = {
+    soldBy,
+    recordedBy: user.id,
+    soldByInstructorId,
   }
 
   try {
@@ -144,6 +172,7 @@ export async function POST(request: NextRequest) {
         amountPaidCents: paid,
         classroomRequired: pkg.classroom_required ?? 0,
         requirements: pkg.requirements ?? null,
+        ...attribution,
       })
 
       // 2. Record the payment + bump lessons (only the activated portion)
@@ -159,6 +188,7 @@ export async function POST(request: NextRequest) {
           paymentMethod,
           description: description ?? null,
           discountCents: discount,
+          ...attribution,
         })
         paymentId = result.paymentId
       }
@@ -214,6 +244,7 @@ export async function POST(request: NextRequest) {
         amountCents,
         paymentMethod,
         description: description ?? null,
+        ...attribution,
       })
 
       return NextResponse.json({ paymentId: result.paymentId }, { status: 201 })
@@ -240,6 +271,9 @@ export async function POST(request: NextRequest) {
         payment_method: paymentMethod,
         description: description ?? null,
         sale_date: saleDate,
+        sold_by: soldBy,
+        recorded_by: user.id,
+        sold_by_instructor_id: soldByInstructorId,
       })
       .select('id')
       .single()

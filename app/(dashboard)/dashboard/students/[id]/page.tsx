@@ -5,6 +5,7 @@ import { ChevronLeft, Mail, Phone, Calendar, FileText, Pencil, ImageIcon, FileBa
 
 import { getStudentById } from '@/lib/services/students'
 import { getActivePackages } from '@/lib/services/packages'
+import { getInstructors } from '@/lib/services/instructors'
 import {
   getStudentBalanceCents,
   getStudentLedger,
@@ -52,12 +53,14 @@ export default async function StudentDetailPage({
     notFound()
   }
 
-  const [packages, balanceCents, ledger, purchases] = await Promise.all([
+  const [packages, balanceCents, ledger, purchases, instructors] = await Promise.all([
     getActivePackages(),
     getStudentBalanceCents(id),
     getStudentLedger(id),
     getStudentPurchases(id),
+    getInstructors(),
   ])
+  const activeInstructors = instructors.filter((i) => i.is_active)
 
   const remaining = student.total_lessons_purchased - student.total_lessons_completed
   const statusConf = studentStatusConfig[student.status]
@@ -197,6 +200,7 @@ export default async function StudentDetailPage({
                   studentId={student.id}
                   studentAgeGroup={student.age_group}
                   packages={packages}
+                  instructors={activeInstructors}
                   currentBalanceCents={balanceCents}
                 />
                 <SendPaymentLinkDialog
