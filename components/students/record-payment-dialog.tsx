@@ -37,12 +37,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { cn, formatCurrency } from '@/lib/utils'
-import type { AgeGroup, Package } from '@/types'
+import { cn, formatCurrency, getFullName } from '@/lib/utils'
+import type { AgeGroup, Package, InstructorWithUser } from '@/types'
 
 type Mode = 'package' | 'custom' | 'balance'
 type PaymentStatus = 'paid_full' | 'partial' | 'unpaid'
 type PaymentMethod = 'cash' | 'check' | 'other'
+type SoldBy = 'operator' | 'instructor'
 
 const formSchema = z
   .object({
@@ -54,8 +55,17 @@ const formSchema = z
     discountDollars: z.string().optional(),
     paymentMethod: z.enum(['cash', 'check', 'other']),
     description: z.string().max(200).optional(),
+    soldBy: z.enum(['operator', 'instructor']),
+    soldByInstructorId: z.string().optional(),
   })
   .superRefine((v, ctx) => {
+    if (v.soldBy === 'instructor' && !v.soldByInstructorId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['soldByInstructorId'],
+        message: 'Pick the instructor',
+      })
+    }
     if (v.mode === 'package') {
       if (!v.packageId) {
         ctx.addIssue({
@@ -119,6 +129,7 @@ interface RecordPaymentDialogProps {
   studentId: string
   studentAgeGroup: AgeGroup
   packages: Package[]
+  instructors: InstructorWithUser[]
   currentBalanceCents?: number
 }
 
@@ -126,6 +137,7 @@ export function RecordPaymentDialog({
   studentId,
   studentAgeGroup,
   packages,
+  instructors,
   currentBalanceCents = 0,
 }: RecordPaymentDialogProps) {
   const router = useRouter()
@@ -146,10 +158,13 @@ export function RecordPaymentDialog({
       discountDollars: '',
       paymentMethod: 'cash',
       description: '',
+      soldBy: 'operator',
+      soldByInstructorId: '',
     },
   })
 
   const mode = form.watch('mode') as Mode
+  const soldBy = form.watch('soldBy') as SoldBy
   const paymentStatus = form.watch('paymentStatus') as PaymentStatus | undefined
   const packageId = form.watch('packageId')
   const amountPaidDollarsStr = form.watch('amountPaidDollars') ?? ''
@@ -171,6 +186,8 @@ export function RecordPaymentDialog({
         discountDollars: '',
         paymentMethod: 'cash',
         description: '',
+        soldBy: 'operator',
+        soldByInstructorId: '',
       })
     }
   }, [open, packages, form])
@@ -231,6 +248,10 @@ export function RecordPaymentDialog({
       mode: values.mode,
       paymentMethod: values.paymentMethod,
       description: values.description?.trim() || null,
+      soldBy: values.soldBy,
+    }
+    if (values.soldBy === 'instructor') {
+      body.soldByInstructorId = values.soldByInstructorId
     }
 
     if (values.mode === 'package') {
@@ -560,7 +581,51 @@ export function RecordPaymentDialog({
             </>
           )}
 
-          {/* Common: concept + payment method */}
+          {/* Common: sold by + concept + payment method */}
+          <div className="space-y-1.5">
+            <Label htmlFor="sold-by">Sold by</Label>
+            <Select
+              value={soldBy}
+              onValueChange={(v) => form.setValue('soldBy', v as SoldBy)}
+            >
+              <SelectTrigger id="sold-by">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="operator">Operator (me)</SelectItem>
+                <SelectItem value="instructor" disabled={instructors.length === 0}>
+                  Instructor
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {soldBy === 'instructor' && (
+            <div className="space-y-1.5">
+              <Label htmlFor="sold-by-instructor">Instructor</Label>
+              <Select
+                value={form.watch('soldByInstructorId') ?? ''}
+                onValueChange={(v) => form.setValue('soldByInstructorId', v)}
+              >
+                <SelectTrigger id="sold-by-instructor">
+                  <SelectValue placeholder="Select an instructor" />
+                </SelectTrigger>
+                <SelectContent>
+                  {instructors.map((i) => (
+                    <SelectItem key={i.id} value={i.id}>
+                      {getFullName(i.user)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {form.formState.errors.soldByInstructorId && (
+                <p className="text-xs text-destructive">
+                  {form.formState.errors.soldByInstructorId.message}
+                </p>
+              )}
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label htmlFor="pmt-description">
               Concept{' '}

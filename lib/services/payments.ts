@@ -3,7 +3,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
-import type { PaymentWithRelations } from '@/types'
+import type { PaymentWithRelations, PaymentSoldBy } from '@/types'
 
 export async function getPayments(): Promise<PaymentWithRelations[]> {
   const supabase = await createClient()
@@ -32,6 +32,9 @@ export interface CreditLessonsArgs {
   description?: string | null
   discountCents?: number        // snapshot of the package discount applied at sale time
   saleDate?: string | null      // ISO timestamp; defaults to now() in DB when omitted
+  soldBy?: PaymentSoldBy | null         // who originated the sale (online/operator/instructor)
+  recordedBy?: string | null            // user id of the admin/operator who recorded it
+  soldByInstructorId?: string | null    // instructor credited with the sale, if any
 }
 
 // Records a completed payment and credits the student's lesson balance.
@@ -55,6 +58,9 @@ export async function creditLessonsForPayment(
     description = null,
     discountCents = 0,
     saleDate = null,
+    soldBy = null,
+    recordedBy = null,
+    soldByInstructorId = null,
   } = args
 
   const insertRow: Record<string, unknown> = {
@@ -70,6 +76,9 @@ export async function creditLessonsForPayment(
     card_last4: cardLast4,
     receipt_url: receiptUrl,
     description,
+    sold_by: soldBy,
+    recorded_by: recordedBy,
+    sold_by_instructor_id: soldByInstructorId,
   }
   if (saleDate) insertRow.sale_date = saleDate
 

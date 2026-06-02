@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { parseISO, startOfMonth, endOfMonth, format } from 'date-fns'
+import { parseISO, startOfMonth, endOfMonth, startOfDay, endOfDay, format } from 'date-fns'
 import { DollarSign, Users, Receipt, Download } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -28,13 +28,14 @@ interface InstructorPayrollReportProps {
 }
 
 export function InstructorPayrollReport({ instructors, lessons }: InstructorPayrollReportProps) {
-  // Default to current month
+  // Default to the current month, but allow any custom date range.
   const now = new Date()
-  const [month, setMonth] = useState(format(now, 'yyyy-MM'))
+  const [startDate, setStartDate] = useState(format(startOfMonth(now), 'yyyy-MM-dd'))
+  const [endDate, setEndDate] = useState(format(endOfMonth(now), 'yyyy-MM-dd'))
 
-  const periodStart = startOfMonth(parseISO(`${month}-01`))
-  const periodEnd = endOfMonth(periodStart)
-  const periodLabel = format(periodStart, 'MMMM yyyy')
+  const periodStart = startOfDay(parseISO(startDate))
+  const periodEnd = endOfDay(parseISO(endDate))
+  const periodLabel = `${format(periodStart, 'MMM d, yyyy')} – ${format(periodEnd, 'MMM d, yyyy')}`
 
   const filteredLessons = useMemo(() => {
     return lessons.filter(lesson => {
@@ -52,11 +53,15 @@ export function InstructorPayrollReport({ instructors, lessons }: InstructorPayr
         )
 
         const completedLessons = instructorLessons.filter(l => l.status === 'completed')
-        const cancelledByInstructor = instructorLessons.filter(
-          l => l.status === 'cancelled' && l.cancelled_by === 'instructor'
+        const cancelledLessons = instructorLessons.filter(l => l.status === 'cancelled')
+        const noShowLessons = instructorLessons.filter(l => l.status === 'no_show')
+        const cancelledByInstructor = cancelledLessons.filter(
+          l => l.cancelled_by === 'instructor'
         )
 
         const completedCount = completedLessons.length
+        const cancelledCount = cancelledLessons.length
+        const noShowCount = noShowLessons.length
         const totalMinutes = completedLessons.reduce((sum, l) => sum + l.duration_minutes, 0)
         const totalHours = totalMinutes / 60
 
@@ -81,6 +86,8 @@ export function InstructorPayrollReport({ instructors, lessons }: InstructorPayr
         return {
           instructor,
           completedCount,
+          cancelledCount,
+          noShowCount,
           totalHours,
           grossEarnings,
           commissionCollected,
@@ -96,6 +103,8 @@ export function InstructorPayrollReport({ instructors, lessons }: InstructorPayr
     return payroll.reduce(
       (acc, p) => ({
         lessons: acc.lessons + p.completedCount,
+        cancelled: acc.cancelled + p.cancelledCount,
+        noShow: acc.noShow + p.noShowCount,
         hours: acc.hours + p.totalHours,
         gross: acc.gross + p.grossEarnings,
         commission: acc.commission + p.commissionCollected,
@@ -103,7 +112,7 @@ export function InstructorPayrollReport({ instructors, lessons }: InstructorPayr
         cancelFees: acc.cancelFees + p.cancelFees,
         net: acc.net + p.netPayable,
       }),
-      { lessons: 0, hours: 0, gross: 0, commission: 0, vehicle: 0, cancelFees: 0, net: 0 }
+      { lessons: 0, cancelled: 0, noShow: 0, hours: 0, gross: 0, commission: 0, vehicle: 0, cancelFees: 0, net: 0 }
     )
   }, [payroll])
 
@@ -112,6 +121,13 @@ export function InstructorPayrollReport({ instructors, lessons }: InstructorPayr
     return filteredLessons
       .filter(l => l.status === 'cancelled' && l.cancelled_by === 'student')
       .reduce((sum, l) => sum + l.cancellation_fee_cents, 0)
+  }, [filteredLessons])
+
+  // No-show fees charged to students (revenue for MDA)
+  const noShowRevenue = useMemo(() => {
+    return filteredLessons
+      .filter(l => l.status === 'no_show')
+      .reduce((sum, l) => sum + (l.no_show_fee_cents ?? 0), 0)
   }, [filteredLessons])
 
   // School-sold lesson revenue (total price - instructor earnings)
@@ -126,7 +142,9 @@ export function InstructorPayrollReport({ instructors, lessons }: InstructorPayr
     const columns: CSVColumn<Row>[] = [
       { header: 'Instructor', value: r => getFullName(r.instructor.user) },
       { header: 'Modality', value: r => r.instructor.modality },
-      { header: 'Lessons', value: r => r.completedCount },
+      { header: 'Completed', value: r => r.completedCount },
+      { header: 'Cancelled', value: r => r.cancelledCount },
+      { header: 'No-show', value: r => r.noShowCount },
       { header: 'Hours', value: r => r.totalHours.toFixed(2) },
       { header: 'Gross', value: r => (r.grossEarnings / 100).toFixed(2) },
       { header: 'Commission', value: r => (r.commissionCollected / 100).toFixed(2) },
@@ -135,21 +153,32 @@ export function InstructorPayrollReport({ instructors, lessons }: InstructorPayr
       { header: 'Net Payable', value: r => (r.netPayable / 100).toFixed(2) },
     ]
     const csv = toCSV(payroll, columns)
-    downloadCSV(`payroll-${month}.csv`, csv)
+    downloadCSV(`payroll-${startDate}_to_${endDate}.csv`, csv)
   }
 
   return (
     <div className="space-y-6">
       {/* Period selector */}
       <div className="flex flex-wrap gap-3 items-end justify-between">
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-muted-foreground font-medium">Month</label>
-          <input
-            type="month"
-            value={month}
-            onChange={e => setMonth(e.target.value)}
-            className="h-9 px-3 rounded-md border border-input bg-background text-sm"
-          />
+        <div className="flex flex-wrap gap-3 items-end">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">From</label>
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => setStartDate(e.target.value)}
+              className="h-9 px-3 rounded-md border border-input bg-background text-sm"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-muted-foreground font-medium">To</label>
+            <input
+              type="date"
+              value={endDate}
+              onChange={e => setEndDate(e.target.value)}
+              className="h-9 px-3 rounded-md border border-input bg-background text-sm"
+            />
+          </div>
         </div>
         <Button
           variant="outline"
@@ -202,7 +231,7 @@ export function InstructorPayrollReport({ instructors, lessons }: InstructorPayr
           </CardHeader>
           <CardContent>
             <p className="text-2xl font-bold">
-              {dollars(totals.commission + totals.vehicle + totals.cancelFees + schoolSoldRevenue + studentCancelRevenue)}
+              {dollars(totals.commission + totals.vehicle + totals.cancelFees + schoolSoldRevenue + studentCancelRevenue + noShowRevenue)}
             </p>
             <p className="text-xs text-muted-foreground mt-1">
               Commission + vehicles + fees + school sales
@@ -223,7 +252,9 @@ export function InstructorPayrollReport({ instructors, lessons }: InstructorPayr
               <TableRow>
                 <TableHead>Instructor</TableHead>
                 <TableHead className="text-center">Modality</TableHead>
-                <TableHead className="text-center">Lessons</TableHead>
+                <TableHead className="text-center">Completed</TableHead>
+                <TableHead className="text-center">Cancelled</TableHead>
+                <TableHead className="text-center">No-show</TableHead>
                 <TableHead className="text-center">Hours</TableHead>
                 <TableHead className="text-right">Gross</TableHead>
                 <TableHead className="text-right">Commission</TableHead>
@@ -234,7 +265,7 @@ export function InstructorPayrollReport({ instructors, lessons }: InstructorPayr
             </TableHeader>
             <TableBody>
               {payroll.map(({
-                instructor, completedCount, totalHours,
+                instructor, completedCount, cancelledCount, noShowCount, totalHours,
                 grossEarnings, commissionCollected, vehicleDeduction,
                 cancelFees, netPayable,
               }) => (
@@ -248,6 +279,8 @@ export function InstructorPayrollReport({ instructors, lessons }: InstructorPayr
                     </Badge>
                   </TableCell>
                   <TableCell className="text-center">{completedCount}</TableCell>
+                  <TableCell className="text-center text-muted-foreground">{cancelledCount}</TableCell>
+                  <TableCell className="text-center text-muted-foreground">{noShowCount}</TableCell>
                   <TableCell className="text-center">{totalHours.toFixed(1)}</TableCell>
                   <TableCell className="text-right">{dollars(grossEarnings)}</TableCell>
                   <TableCell className="text-right text-muted-foreground">
@@ -270,6 +303,8 @@ export function InstructorPayrollReport({ instructors, lessons }: InstructorPayr
                 <TableCell>Total</TableCell>
                 <TableCell />
                 <TableCell className="text-center">{totals.lessons}</TableCell>
+                <TableCell className="text-center">{totals.cancelled}</TableCell>
+                <TableCell className="text-center">{totals.noShow}</TableCell>
                 <TableCell className="text-center">{totals.hours.toFixed(1)}</TableCell>
                 <TableCell className="text-right">{dollars(totals.gross)}</TableCell>
                 <TableCell className="text-right">
@@ -315,10 +350,14 @@ export function InstructorPayrollReport({ instructors, lessons }: InstructorPayr
               <span className="text-muted-foreground">Student cancellation fees</span>
               <span className="font-medium">{dollars(studentCancelRevenue)}</span>
             </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">No-show fees</span>
+              <span className="font-medium">{dollars(noShowRevenue)}</span>
+            </div>
             <div className="flex justify-between border-t pt-2 font-semibold">
               <span>Total MDA Revenue</span>
               <span>
-                {dollars(totals.commission + schoolSoldRevenue + totals.vehicle + totals.cancelFees + studentCancelRevenue)}
+                {dollars(totals.commission + schoolSoldRevenue + totals.vehicle + totals.cancelFees + studentCancelRevenue + noShowRevenue)}
               </span>
             </div>
           </div>

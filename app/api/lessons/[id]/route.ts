@@ -5,9 +5,17 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { estimateTravelMinutes } from '@/lib/travel-time'
+import { insertLedgerEntry } from '@/lib/services/student-ledger'
+
+// A cancellation/reschedule within this window of the lesson start charges a fee.
+const CANCELLATION_WINDOW_HOURS = 24
 
 const updateLessonSchema = z.object({
   status: z.enum(['cancelled', 'completed', 'no_show']).optional(),
+  // Who initiated a cancellation. Optional override so an admin can attribute a
+  // cancellation to the student (and trigger the late-cancellation charge).
+  // Falls back to the caller's role when omitted.
+  cancelledBy: z.enum(['student', 'instructor', 'admin']).optional(),
   scheduledAt: z.string().datetime().optional(),
   durationMinutes: z.number().int().min(15).max(240).optional(),
   vehicleId: z.string().uuid().nullable().optional(),
@@ -192,11 +200,21 @@ export async function PATCH(
     }
   }
 
+  // Hours remaining until the lesson starts (used for the 24h fee window).
+  const hoursUntilLesson =
+    (new Date(existing.scheduled_at).getTime() - Date.now()) / (1000 * 60 * 60)
+  const withinFeeWindow = hoursUntilLesson < CANCELLATION_WINDOW_HOURS
+
+  // Deferred student ledger charge — inserted after the lesson update succeeds.
+  let studentCharge: { cents: number; description: string } | null = null
+
   // ── Track cancellation fees ─────────────────────────────────
   if (updates.status === 'cancelled' && existing.status !== 'cancelled') {
-    // Determine who cancelled based on user role
+    // Who cancelled: explicit override (admin can attribute to student) or role.
     let cancelledBy: string
-    if (profile.role === 'instructor') {
+    if (updates.cancelledBy) {
+      cancelledBy = updates.cancelledBy
+    } else if (profile.role === 'instructor') {
       cancelledBy = 'instructor'
     } else if (profile.role === 'student') {
       cancelledBy = 'student'
@@ -205,8 +223,9 @@ export async function PATCH(
     }
     lessonUpdates.cancelled_by = cancelledBy
 
-    // Fetch school cancellation fee settings
-    if (cancelledBy !== 'admin') {
+    // A fee only applies when cancelling within the 24h window. Cancelling
+    // 48h+ ahead is free; 12h ahead is charged.
+    if (cancelledBy !== 'admin' && withinFeeWindow) {
       const { data: school } = await adminClient
         .from('schools')
         .select('student_cancellation_fee_cents, instructor_cancellation_fee_cents')
@@ -214,10 +233,56 @@ export async function PATCH(
         .single()
 
       if (school) {
-        lessonUpdates.cancellation_fee_cents = cancelledBy === 'student'
+        const fee = cancelledBy === 'student'
           ? school.student_cancellation_fee_cents
           : school.instructor_cancellation_fee_cents
+        lessonUpdates.cancellation_fee_cents = fee
+
+        // The student fee is billed to the student's account. The instructor
+        // fee is handled as a payroll deduction (no student charge).
+        if (cancelledBy === 'student' && fee > 0) {
+          studentCharge = { cents: fee, description: 'Late cancellation fee (<24h)' }
+        }
       }
+    }
+  }
+
+  // ── No-show fee ─────────────────────────────────────────────
+  // Marking a no-show charges a configurable fee to the student. The lesson
+  // credit is refunded below (the student keeps the lesson, only loses the fee).
+  if (updates.status === 'no_show' && existing.status !== 'no_show') {
+    const { data: school } = await adminClient
+      .from('schools')
+      .select('student_no_show_fee_cents')
+      .eq('id', existing.school_id)
+      .single()
+
+    const fee = school?.student_no_show_fee_cents ?? 0
+    if (fee > 0) {
+      lessonUpdates.no_show_fee_cents = fee
+      studentCharge = { cents: fee, description: 'No-show fee' }
+    }
+  }
+
+  // ── Late reschedule fee ─────────────────────────────────────
+  // Rescheduling a scheduled lesson within the 24h window, when attributed to
+  // the student, is treated like a late cancellation and charges the fee.
+  if (
+    updates.scheduledAt &&
+    !updates.status &&
+    existing.status === 'scheduled' &&
+    updates.cancelledBy === 'student' &&
+    withinFeeWindow
+  ) {
+    const { data: school } = await adminClient
+      .from('schools')
+      .select('student_cancellation_fee_cents')
+      .eq('id', existing.school_id)
+      .single()
+
+    const fee = school?.student_cancellation_fee_cents ?? 0
+    if (fee > 0) {
+      studentCharge = { cents: fee, description: 'Late reschedule fee (<24h)' }
     }
   }
 
@@ -227,6 +292,35 @@ export async function PATCH(
     .eq('id', id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Bill the student for a late cancellation / reschedule / no-show fee.
+  if (studentCharge) {
+    await insertLedgerEntry({
+      client: adminClient,
+      schoolId: existing.school_id,
+      studentId: existing.student_id,
+      amountCents: studentCharge.cents,
+      entryType: 'charge',
+      description: studentCharge.description,
+      createdBy: user.id,
+    })
+  }
+
+  // No-show refunds the lesson credit (student keeps the lesson, only pays the fee).
+  if (updates.status === 'no_show' && existing.status === 'scheduled') {
+    const { data: student } = await adminClient
+      .from('students')
+      .select('lessons_remaining')
+      .eq('id', existing.student_id)
+      .single()
+
+    if (student) {
+      await adminClient
+        .from('students')
+        .update({ lessons_remaining: student.lessons_remaining + 1 })
+        .eq('id', existing.student_id)
+    }
+  }
 
   // When marking a lesson as completed, increment the student's completed lesson count
   if (updates.status === 'completed' && existing.status !== 'completed') {

@@ -11,6 +11,9 @@ export type LessonStatus = 'scheduled' | 'completed' | 'cancelled' | 'no_show'
 
 export type PaymentStatus = 'pending' | 'completed' | 'refunded' | 'failed'
 
+// Who recorded/originated a sale or payment
+export type PaymentSoldBy = 'online' | 'operator' | 'instructor'
+
 // ── Schools ──────────────────────────────────────────────────
 export type SchoolTimezone =
   | 'America/New_York'
@@ -35,6 +38,7 @@ export interface School {
   single_lesson_price_cents: number
   student_cancellation_fee_cents: number
   instructor_cancellation_fee_cents: number
+  student_no_show_fee_cents: number
   max_booking_days_ahead: number
   created_at: string
 }
@@ -171,6 +175,7 @@ export interface Lesson {
   instructor_earning_cents: number
   cancelled_by: LessonCancelledBy | null
   cancellation_fee_cents: number
+  no_show_fee_cents: number
   opening_id: string | null
   created_at: string
 }
@@ -212,6 +217,9 @@ export interface Payment {
   description: string | null
   sale_date: string             // when the package/lessons were added to the student
   created_at: string            // when the payment money actually arrived (paid_at)
+  sold_by: PaymentSoldBy | null // null on legacy rows
+  recorded_by: string | null    // user id of the admin/operator who recorded it (null for online)
+  sold_by_instructor_id: string | null // set when attributed to a specific instructor
 }
 
 // ── Student Purchases ────────────────────────────────────────
@@ -230,6 +238,14 @@ export interface StudentPurchase {
   amount_paid_cents: number
   requirements: string | null    // snapshot of package.requirements at sale time
   created_at: string
+  sold_by: PaymentSoldBy | null  // null on legacy rows
+  recorded_by: string | null     // user id of the admin/operator who recorded the sale
+  sold_by_instructor_id: string | null // set when attributed to a specific instructor
+}
+
+export interface StudentPurchaseWithRelations extends StudentPurchase {
+  student: StudentWithUser
+  sold_by_instructor: InstructorWithUser | null
 }
 
 // ── Student Ledger ───────────────────────────────────────────

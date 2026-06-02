@@ -10,11 +10,13 @@ import type {
   StudentWithUser,
   InstructorWithUser,
   ClassroomSessionWithRelations,
+  StudentPurchaseWithRelations,
 } from '@/types'
 
 export interface ReportsData {
   lessons: LessonWithRelations[]
   payments: PaymentWithRelations[]
+  purchases: StudentPurchaseWithRelations[]
   students: StudentWithUser[]
   instructors: InstructorWithUser[]
   studentBalances: Record<string, number>
@@ -42,6 +44,17 @@ export async function getReportsData(): Promise<ReportsData> {
     .order('created_at', { ascending: false })
 
   if (paymentsError) throw new Error(paymentsError.message)
+
+  const { data: purchases, error: purchasesError } = await supabase
+    .from('student_purchases')
+    .select(`
+      *,
+      student:students(*, user:users!user_id(*)),
+      sold_by_instructor:instructors!sold_by_instructor_id(*, user:users(*))
+    `)
+    .order('created_at', { ascending: false })
+
+  if (purchasesError) throw new Error(purchasesError.message)
 
   const { data: students, error: studentsError } = await supabase
     .from('students')
@@ -77,6 +90,7 @@ export async function getReportsData(): Promise<ReportsData> {
   return {
     lessons: (lessons ?? []) as unknown as LessonWithRelations[],
     payments: (payments ?? []) as unknown as PaymentWithRelations[],
+    purchases: (purchases ?? []) as unknown as StudentPurchaseWithRelations[],
     students: studentList,
     instructors: (instructors ?? []) as unknown as InstructorWithUser[],
     studentBalances: Object.fromEntries(balances),

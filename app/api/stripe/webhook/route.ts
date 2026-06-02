@@ -144,6 +144,7 @@ export async function POST(request: NextRequest) {
           receipt_url: receiptUrl,
           description: 'Balance payment (card)',
           sale_date: saleDate,
+          sold_by: 'online',
         })
         .select('id')
         .single()
@@ -210,6 +211,7 @@ export async function POST(request: NextRequest) {
       amountPaidCents: amountCents,
       classroomRequired,
       requirements,
+      soldBy: 'online',
     })
 
     await creditLessonsForPayment({
@@ -226,6 +228,7 @@ export async function POST(request: NextRequest) {
       cardLast4,
       stripePaymentIntentId: completedSession.payment_intent ?? null,
       receiptUrl,
+      soldBy: 'online',
     })
 
     // Fire-and-forget confirmation email. Paid in full → all lessons activated.

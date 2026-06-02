@@ -52,11 +52,12 @@ export function PackageCheckout({ packages, singleLessonPriceCents }: PackageChe
       <div className="rounded-md border border-blue-200 bg-blue-50 p-3 text-xs text-blue-900 flex items-start gap-2 mb-4">
         <CreditCard className="h-3.5 w-3.5 mt-0.5 shrink-0" />
         <div>
-          <p className="font-semibold mb-0.5">{surchargePct}% card processing fee</p>
+          <p className="font-semibold mb-0.5">{surchargePct}% card processing fee applies</p>
           <p className="leading-relaxed">
-            Card payments are processed through Stripe and include a {surchargePct}%
-            processing fee on top of the package price. The full breakdown is shown
-            on the secure Stripe checkout page before you confirm.
+            A {surchargePct}% card processing fee <span className="font-semibold">will be added
+            to your total</span> on top of the package price. Card payments are processed
+            securely through Stripe; the full breakdown is shown on the checkout page before
+            you confirm.
           </p>
         </div>
       </div>

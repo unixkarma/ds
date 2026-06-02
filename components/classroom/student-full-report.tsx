@@ -1,13 +1,16 @@
 'use client'
 
-import { Printer } from 'lucide-react'
-import { format } from 'date-fns'
+import { Printer, Download } from 'lucide-react'
+import { format, parseISO } from 'date-fns'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { formatCurrency, formatDate, formatDateTime, formatHours, getFullName } from '@/lib/utils'
+import { toCSV, downloadCSV, type CSVColumn } from '@/lib/csv'
 import type { StudentFullReport } from '@/lib/services/students'
 import type { LessonStatus, ClassroomAttendanceStatus } from '@/types'
+
+const csvDate = (iso: string) => format(parseISO(iso), 'yyyy-MM-dd')
 
 const LESSON_BADGE: Record<LessonStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   scheduled: 'secondary',
@@ -47,6 +50,54 @@ export function StudentFullReportView({ report }: StudentFullReportProps) {
     (r) => r.status === 'present' || r.status === 'late'
   ).length
 
+  // Export every section of the printable report into one CSV file, with a
+  // labelled block per section.
+  function handleExportCsv() {
+    const lessonCols: CSVColumn<(typeof lessons)[number]>[] = [
+      { header: 'Date', value: (l) => csvDate(l.scheduled_at) },
+      { header: 'Instructor', value: (l) => getFullName(l.instructor.user) },
+      { header: 'Hours', value: (l) => (l.duration_minutes / 60).toFixed(2) },
+      { header: 'Status', value: (l) => l.status },
+    ]
+    const classroomCols: CSVColumn<(typeof classroomAttendance)[number]>[] = [
+      { header: 'Date', value: (r) => csvDate(r.session.scheduled_at) },
+      { header: 'Topic', value: (r) => r.session.topic || '' },
+      { header: 'Hours', value: (r) => (r.session.duration_minutes / 60).toFixed(2) },
+      { header: 'Status', value: (r) => r.status },
+    ]
+    const purchaseCols: CSVColumn<(typeof purchases)[number]>[] = [
+      { header: 'Date', value: (p) => csvDate(p.created_at) },
+      { header: 'Package', value: (p) => p.package_name },
+      { header: 'Lessons activated', value: (p) => p.lessons_activated },
+      { header: 'Total lessons', value: (p) => p.total_lessons },
+      { header: 'Amount paid', value: (p) => (p.amount_paid_cents / 100).toFixed(2) },
+      { header: 'Effective price', value: (p) => ((p.price_cents - (p.discount_cents ?? 0)) / 100).toFixed(2) },
+    ]
+    const paymentCols: CSVColumn<(typeof payments)[number]>[] = [
+      { header: 'Date', value: (p) => csvDate(p.created_at) },
+      { header: 'Method', value: (p) => p.payment_method ?? '' },
+      { header: 'Amount', value: (p) => (p.amount_cents / 100).toFixed(2) },
+      { header: 'Description', value: (p) => p.description ?? p.package?.name ?? '' },
+    ]
+    const ledgerCols: CSVColumn<(typeof ledger)[number]>[] = [
+      { header: 'Date', value: (e) => csvDate(e.created_at) },
+      { header: 'Type', value: (e) => e.entry_type },
+      { header: 'Description', value: (e) => e.description },
+      { header: 'Amount', value: (e) => (Number(e.amount_cents) / 100).toFixed(2) },
+    ]
+
+    const blocks = [
+      ['Lessons', toCSV(lessons, lessonCols)],
+      ['Classroom attendance', toCSV(classroomAttendance, classroomCols)],
+      ['Purchases', toCSV(purchases, purchaseCols)],
+      ['Payments', toCSV(payments, paymentCols)],
+      ['Balance history', toCSV(ledger, ledgerCols)],
+    ]
+    const csv = blocks.map(([title, body]) => `${title}\n${body}`).join('\n\n')
+    const slug = getFullName(student.user).toLowerCase().replace(/[^a-z0-9]+/g, '-')
+    downloadCSV(`student-report-${slug}-${format(new Date(), 'yyyy-MM-dd')}.csv`, csv)
+  }
+
   return (
     <div className="space-y-6 max-w-4xl">
       {/* Header — actions hidden in print */}
@@ -60,15 +111,16 @@ export function StudentFullReportView({ report }: StudentFullReportProps) {
             Generated {formatDateTime(new Date().toISOString())}
           </p>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="print:hidden"
-          onClick={() => window.print()}
-        >
-          <Printer className="h-4 w-4 mr-1" />
-          Print
-        </Button>
+        <div className="flex gap-2 print:hidden">
+          <Button variant="outline" size="sm" onClick={handleExportCsv}>
+            <Download className="h-4 w-4 mr-1" />
+            Export CSV
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
+            <Printer className="h-4 w-4 mr-1" />
+            Print
+          </Button>
+        </div>
       </div>
 
       {/* Profile */}
