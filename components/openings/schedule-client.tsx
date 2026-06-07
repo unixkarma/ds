@@ -236,7 +236,7 @@ export function ScheduleClient({
     })
     setSubmittingDayOff(false)
     if (res.ok) {
-      toast.success('Day off added')
+      toast.success('Day off requested — pending admin approval')
       setNewDayOffDate('')
       setNewDayOffReason('')
       router.refresh()
@@ -309,7 +309,8 @@ export function ScheduleClient({
     list.push(o)
     openingsByDay.set(key, list)
   }
-  const daysOffSet = new Set(daysOff.map(d => d.date))
+  // Only approved days off actually block the calendar; pending requests don't yet.
+  const daysOffSet = new Set(daysOff.filter(d => d.status === 'approved').map(d => d.date))
 
   return (
     <div className="space-y-6">
@@ -430,10 +431,10 @@ export function ScheduleClient({
         <TabsContent value="days-off" className="space-y-4 pt-2">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Mark a day off</CardTitle>
+              <CardTitle className="text-base">Request a day off</CardTitle>
               <CardDescription>
-                Vacation, sick day, holiday — anything. Openings on that date will be removed.
-                If you have booked lessons on that day, cancel them first.
+                Vacation, sick day, holiday — anything. Your request is sent to the admin for
+                approval; openings on that date are only removed once it&apos;s approved.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -489,6 +490,18 @@ export function ScheduleClient({
                         <div className="text-sm font-medium tabular-nums">
                           {DAY_SHORT_ARR[date.getDay()]} · {MONTH_SHORT[date.getMonth()]} {date.getDate()}
                         </div>
+                        <Badge
+                          variant={
+                            d.status === 'approved'
+                              ? 'default'
+                              : d.status === 'rejected'
+                              ? 'destructive'
+                              : 'outline'
+                          }
+                          className="text-[10px] capitalize"
+                        >
+                          {d.status}
+                        </Badge>
                         {d.reason && (
                           <span className="text-xs text-muted-foreground truncate">{d.reason}</span>
                         )}

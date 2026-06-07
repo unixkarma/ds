@@ -100,6 +100,8 @@ export function StudentForm({ student }: StudentFormProps) {
 
   // Auto-select teen/adult when DOB changes. User can still override manually.
   const watchedDob = form.watch('dateOfBirth')
+  // Drives the contact section: teens require a phone, adults don't.
+  const isTeen = form.watch('ageGroup') === 'teen'
   useEffect(() => {
     const detected = ageGroupFromDob(watchedDob)
     if (detected && form.getValues('ageGroup') !== detected) {
@@ -125,10 +127,15 @@ export function StudentForm({ student }: StudentFormProps) {
       }
     }
 
-    // At least one parent/emergency phone is required (matches DB constraint)
-    if (!values.parent1Phone.trim() && !values.parent2Phone.trim()) {
+    // A parent/emergency phone is mandatory only for teens. Adults can leave
+    // the contact section blank.
+    if (
+      values.ageGroup === 'teen' &&
+      !values.parent1Phone.trim() &&
+      !values.parent2Phone.trim()
+    ) {
       form.setError('parent1Phone', {
-        message: 'At least one parent/emergency contact phone is required',
+        message: 'At least one parent/emergency contact phone is required for teen students',
       })
       return
     }
@@ -330,9 +337,14 @@ export function StudentForm({ student }: StudentFormProps) {
         {/* Parent / Emergency Contact */}
         <div className="border rounded-md p-4 space-y-4 bg-muted/30">
           <div>
-            <h3 className="font-medium text-sm">Parent / Emergency Contact</h3>
+            <h3 className="font-medium text-sm">
+              Parent / Emergency Contact
+              {!isTeen && <span className="text-muted-foreground font-normal"> (optional)</span>}
+            </h3>
             <p className="text-xs text-muted-foreground mt-1">
-              At least one phone number is required. For teen students, parent details are mandatory.
+              {isTeen
+                ? 'For teen students, at least one parent/emergency contact phone is required.'
+                : 'Optional for adult students. Add a contact if you have one on file.'}
             </p>
           </div>
 
@@ -357,7 +369,7 @@ export function StudentForm({ student }: StudentFormProps) {
                 name="parent1Phone"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-xs">Phone *</FormLabel>
+                    <FormLabel className="text-xs">Phone{isTeen ? ' *' : ''}</FormLabel>
                     <FormControl>
                       <Input type="tel" placeholder="+1 555 000 0000" {...field} />
                     </FormControl>

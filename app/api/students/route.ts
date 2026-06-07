@@ -26,10 +26,16 @@ const createStudentSchema = z
     parent2Phone: z.string().optional().nullable(),
     parent2Email: z.string().email().or(z.literal('')).optional().nullable(),
   })
-  .refine((d) => (d.parent1Phone?.trim() ?? '') !== '' || (d.parent2Phone?.trim() ?? '') !== '', {
-    message: 'At least one parent/emergency contact phone is required',
-    path: ['parent1Phone'],
-  })
+  .refine(
+    (d) =>
+      d.ageGroup !== 'teen' ||
+      (d.parent1Phone?.trim() ?? '') !== '' ||
+      (d.parent2Phone?.trim() ?? '') !== '',
+    {
+      message: 'At least one parent/emergency contact phone is required for teen students',
+      path: ['parent1Phone'],
+    },
+  )
 
 export async function POST(request: NextRequest) {
   // 1. Verify the caller is an authenticated admin

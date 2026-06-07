@@ -355,12 +355,17 @@ export interface OpeningWithInstructor extends Opening {
   instructor: InstructorWithUser
 }
 
+export type DayOffStatus = 'pending' | 'approved' | 'rejected'
+
 export interface InstructorDayOff {
   id: string
   school_id: string
   instructor_id: string
   date: string         // YYYY-MM-DD
   reason: string | null
+  status: DayOffStatus
+  reviewed_by: string | null
+  reviewed_at: string | null
   created_at: string
 }
 
