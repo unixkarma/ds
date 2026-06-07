@@ -8,6 +8,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { regenerateOpenings } from '@/lib/services/openings-generator'
+import { notifyDayOffDecision } from '@/lib/email/send-day-off-decision'
 
 const reviewSchema = z.object({
   status: z.enum(['approved', 'rejected']),
@@ -46,7 +47,7 @@ export async function PATCH(
 
   const { data: existing } = await supabase
     .from('instructor_days_off')
-    .select('id, school_id, instructor_id, date')
+    .select('id, school_id, instructor_id, date, reason')
     .eq('id', id)
     .single()
 
@@ -91,6 +92,16 @@ export async function PATCH(
   await regenerateOpenings({
     instructorId: existing.instructor_id,
     schoolId: profile.school_id,
+  })
+
+  // Let the instructor know the decision (no-ops if email isn't configured).
+  await notifyDayOffDecision({
+    client: adminClient,
+    schoolId: profile.school_id,
+    instructorId: existing.instructor_id,
+    decision: status,
+    date: existing.date,
+    reason: existing.reason ?? null,
   })
 
   return NextResponse.json({ success: true })
