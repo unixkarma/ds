@@ -120,26 +120,34 @@ export async function POST(request: NextRequest) {
 
   const adminClient = createAdminClient()
 
-  // Block if any booked opening exists on that date for this instructor.
-  const dayStart = new Date(date + 'T00:00:00').toISOString()
-  const nextDay = new Date(date + 'T00:00:00')
-  nextDay.setDate(nextDay.getDate() + 1)
+  // Admin-marked days off apply immediately; instructor requests await approval.
+  const isAdmin = profile.role === 'admin'
+  const status = isAdmin ? 'approved' : 'pending'
 
-  const { data: bookedOnDay } = await adminClient
-    .from('openings')
-    .select('id')
-    .eq('instructor_id', instructorId)
-    .eq('status', 'booked')
-    .gte('scheduled_at', dayStart)
-    .lt('scheduled_at', nextDay.toISOString())
+  // Only block on booked lessons when the day off takes effect immediately
+  // (admin direct). A pending request is allowed even if lessons exist — the
+  // admin resolves any conflict when approving.
+  if (status === 'approved') {
+    const dayStart = new Date(date + 'T00:00:00').toISOString()
+    const nextDay = new Date(date + 'T00:00:00')
+    nextDay.setDate(nextDay.getDate() + 1)
 
-  if ((bookedOnDay ?? []).length > 0) {
-    return NextResponse.json(
-      {
-        error: `There are ${bookedOnDay!.length} booked lesson(s) on ${date}. Cancel them first before marking the day off.`,
-      },
-      { status: 409 }
-    )
+    const { data: bookedOnDay } = await adminClient
+      .from('openings')
+      .select('id')
+      .eq('instructor_id', instructorId)
+      .eq('status', 'booked')
+      .gte('scheduled_at', dayStart)
+      .lt('scheduled_at', nextDay.toISOString())
+
+    if ((bookedOnDay ?? []).length > 0) {
+      return NextResponse.json(
+        {
+          error: `There are ${bookedOnDay!.length} booked lesson(s) on ${date}. Cancel them first before marking the day off.`,
+        },
+        { status: 409 }
+      )
+    }
   }
 
   // Insert
@@ -150,6 +158,9 @@ export async function POST(request: NextRequest) {
       instructor_id: instructorId,
       date,
       reason: reason ?? null,
+      status,
+      reviewed_by: isAdmin ? user.id : null,
+      reviewed_at: isAdmin ? new Date().toISOString() : null,
     })
     .select()
     .single()
@@ -157,15 +168,17 @@ export async function POST(request: NextRequest) {
   if (error) {
     if (error.code === '23505') {
       return NextResponse.json(
-        { error: `${date} is already marked as off.` },
+        { error: `${date} is already marked as off (or has a pending request).` },
         { status: 409 }
       )
     }
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  // Regenerate to wipe the available openings on that day.
-  await regenerateOpenings({ instructorId, schoolId: profile.school_id })
+  // Only an approved day off changes the schedule.
+  if (status === 'approved') {
+    await regenerateOpenings({ instructorId, schoolId: profile.school_id })
+  }
 
   return NextResponse.json({ dayOff }, { status: 201 })
 }

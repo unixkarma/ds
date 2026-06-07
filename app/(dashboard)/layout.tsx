@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { Sidebar } from '@/components/dashboard/sidebar'
 import { Header } from '@/components/dashboard/header'
 import { getPendingApplicationsCount } from '@/lib/services/applications'
+import { getPendingDaysOffCount } from '@/lib/services/days-off'
 
 // Protect all /dashboard/* routes — server-side auth check
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
@@ -30,12 +31,13 @@ export default async function DashboardLayout({ children }: { children: ReactNod
     (profile?.school as unknown as { name: string } | null)?.name ?? 'My School'
 
   const pendingApplications = await getPendingApplicationsCount()
+  const pendingDaysOff = await getPendingDaysOffCount()
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Desktop sidebar — hidden on mobile */}
       <aside className="hidden md:flex md:flex-col md:w-60 border-r flex-shrink-0">
-        <Sidebar schoolName={schoolName} pendingApplications={pendingApplications} />
+        <Sidebar schoolName={schoolName} pendingApplications={pendingApplications} pendingDaysOff={pendingDaysOff} />
       </aside>
 
       {/* Main area */}
@@ -48,6 +50,7 @@ export default async function DashboardLayout({ children }: { children: ReactNod
           }}
           schoolName={schoolName}
           pendingApplications={pendingApplications}
+          pendingDaysOff={pendingDaysOff}
         />
 
         {/* Page content */}

@@ -73,11 +73,13 @@ export async function regenerateOpenings({
 
   const tpls = (templates ?? []) as OpeningTemplate[]
 
-  // 3. Days off in window
+  // 3. Days off in window — only APPROVED days off block the schedule.
+  //    Pending requests await admin approval; rejected ones never apply.
   const { data: daysOff } = await admin
     .from('instructor_days_off')
     .select('date')
     .eq('instructor_id', instructorId)
+    .eq('status', 'approved')
     .gte('date', toDateKey(today))
     .lt('date', toDateKey(horizon))
 

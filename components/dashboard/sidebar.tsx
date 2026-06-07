@@ -14,17 +14,19 @@ import {
   Settings,
   ClipboardList,
   GraduationCap,
+  CalendarOff,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 
-// Navigation items — links marked as 'coming soon' will be disabled until built
+// Navigation items — `badge` names which pending counter shows on that link
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { href: '/dashboard/students', label: 'Students', icon: Users },
   { href: '/dashboard/instructors', label: 'Instructors', icon: UserCheck },
-  { href: '/dashboard/applications', label: 'Applications', icon: ClipboardList, badge: true },
+  { href: '/dashboard/applications', label: 'Applications', icon: ClipboardList, badge: 'applications' as const },
   { href: '/dashboard/schedule', label: 'Schedule', icon: Calendar },
+  { href: '/dashboard/time-off', label: 'Time Off', icon: CalendarOff, badge: 'daysOff' as const },
   { href: '/dashboard/classroom', label: 'Classroom', icon: GraduationCap },
   { href: '/dashboard/vehicles', label: 'Vehicles', icon: Car },
   { href: '/dashboard/packages', label: 'Packages', icon: Package },
@@ -36,10 +38,12 @@ const navItems = [
 interface SidebarProps {
   schoolName: string
   pendingApplications?: number
+  pendingDaysOff?: number
 }
 
-export function Sidebar({ schoolName, pendingApplications = 0 }: SidebarProps) {
+export function Sidebar({ schoolName, pendingApplications = 0, pendingDaysOff = 0 }: SidebarProps) {
   const pathname = usePathname()
+  const badgeCounts = { applications: pendingApplications, daysOff: pendingDaysOff }
 
   return (
     <div className="flex flex-col h-full">
@@ -63,6 +67,7 @@ export function Sidebar({ schoolName, pendingApplications = 0 }: SidebarProps) {
             ? pathname === item.href
             : pathname.startsWith(item.href)
           const Icon = item.icon
+          const badgeCount = item.badge ? badgeCounts[item.badge] : 0
 
           return (
             <Link
@@ -77,9 +82,9 @@ export function Sidebar({ schoolName, pendingApplications = 0 }: SidebarProps) {
             >
               <Icon className="h-4 w-4 flex-shrink-0" />
               {item.label}
-              {item.badge && pendingApplications > 0 && (
+              {badgeCount > 0 && (
                 <span className="ml-auto inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-destructive text-destructive-foreground text-xs font-semibold">
-                  {pendingApplications}
+                  {badgeCount}
                 </span>
               )}
             </Link>

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { Search, UserPlus, MoreHorizontal, Pencil, Power } from 'lucide-react'
+import { Search, UserPlus, MoreHorizontal, Pencil, Power, KeyRound, Mail } from 'lucide-react'
 
 import { cn, formatCurrency, formatDate, getFullName } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { SetPasswordDialog } from '@/components/students/set-password-dialog'
 import type { StudentWithUser, StudentStatus } from '@/types'
 
 // ── Status badge ──────────────────────────────────────────────
@@ -48,6 +49,8 @@ export function StudentTable({ students, balances = {} }: StudentTableProps) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [sendingResetId, setSendingResetId] = useState<string | null>(null)
+  const [setPwStudent, setSetPwStudent] = useState<{ id: string; name: string } | null>(null)
 
   // Client-side filtering
   const filtered = students.filter((s) => {
@@ -75,6 +78,22 @@ export function StudentTable({ students, balances = {} }: StudentTableProps) {
 
     router.refresh()
     setTogglingId(null)
+  }
+
+  async function sendResetEmail(student: StudentWithUser) {
+    setSendingResetId(student.id)
+    const res = await fetch(`/api/students/${student.id}/reset-password`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode: 'email' }),
+    })
+    if (res.ok) {
+      alert(`Reset email sent to ${student.user.email}`)
+    } else {
+      const data = await res.json()
+      alert(`Failed to send: ${data.error}`)
+    }
+    setSendingResetId(null)
   }
 
   return (
@@ -221,6 +240,24 @@ export function StudentTable({ students, balances = {} }: StudentTableProps) {
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem
+                            onClick={() =>
+                              setSetPwStudent({
+                                id: student.id,
+                                name: getFullName(student.user),
+                              })
+                            }
+                          >
+                            <KeyRound className="mr-2 h-4 w-4" />
+                            Set password
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => sendResetEmail(student)}
+                            disabled={sendingResetId === student.id}
+                          >
+                            <Mail className="mr-2 h-4 w-4" />
+                            {sendingResetId === student.id ? 'Sending...' : 'Send reset email'}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
                             onClick={() => toggleStatus(student)}
                             disabled={togglingId === student.id}
                             className={
@@ -246,6 +283,15 @@ export function StudentTable({ students, balances = {} }: StudentTableProps) {
       <p className="text-xs text-muted-foreground">
         Showing {filtered.length} of {students.length} students
       </p>
+
+      <SetPasswordDialog
+        open={!!setPwStudent}
+        onOpenChange={(open) => {
+          if (!open) setSetPwStudent(null)
+        }}
+        studentId={setPwStudent?.id ?? null}
+        studentName={setPwStudent?.name ?? ''}
+      />
     </div>
   )
 }
