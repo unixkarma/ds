@@ -1,9 +1,36 @@
+// GET /api/classroom — list classroom sessions in a date range
 // POST /api/classroom — create a classroom session (admin only)
 
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { listClassroomSessions } from '@/lib/services/classroom'
+
+export async function GET(request: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { searchParams } = new URL(request.url)
+  const start = searchParams.get('start')
+  const end = searchParams.get('end')
+
+  if (!start || !end) {
+    return NextResponse.json({ error: 'start and end are required' }, { status: 400 })
+  }
+
+  try {
+    const sessions = await listClassroomSessions({
+      fromDate: new Date(start),
+      toDate: new Date(end),
+    })
+    return NextResponse.json({ sessions })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to load sessions'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
 
 const createSchema = z.object({
   instructor_id: z.string().uuid().nullable().optional(),

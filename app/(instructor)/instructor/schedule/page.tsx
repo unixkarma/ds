@@ -1,12 +1,14 @@
 import { redirect } from 'next/navigation'
 import { format } from 'date-fns'
+import { GraduationCap, MapPin, Users } from 'lucide-react'
 
 import { getInstructorPortalData } from '@/lib/services/instructor-portal'
+import { listClassroomSessions } from '@/lib/services/classroom'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { LessonActions } from '@/components/instructor/lesson-actions'
-import type { LessonWithRelations, LessonStatus } from '@/types'
+import type { LessonWithRelations, LessonStatus, ClassroomSessionWithRelations } from '@/types'
 
 const STATUS_BADGE: Record<LessonStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   scheduled: 'default',
@@ -40,6 +42,12 @@ export default async function InstructorSchedulePage() {
 
   const allLessons = (lessons ?? []) as unknown as LessonWithRelations[]
 
+  // Classroom sessions for this instructor (past 30 days + future)
+  const allSessions = await listClassroomSessions({
+    instructorId: instructor.id,
+    fromDate: thirtyDaysAgo,
+  })
+
   // Split into upcoming and past
   const now = new Date()
   const upcoming = allLessons
@@ -48,6 +56,12 @@ export default async function InstructorSchedulePage() {
   const past = allLessons.filter(
     l => new Date(l.scheduled_at) < now || l.status !== 'scheduled'
   )
+  const upcomingSessions = allSessions
+    .filter(s => new Date(s.scheduled_at) >= now && s.status === 'scheduled')
+    .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
+  const pastSessions = allSessions
+    .filter(s => new Date(s.scheduled_at) < now || s.status !== 'scheduled')
+    .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime())
 
   return (
     <div className="space-y-8">
@@ -89,6 +103,103 @@ export default async function InstructorSchedulePage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Classroom sessions — only shown to instructors who teach classes */}
+      {allSessions.length > 0 && (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <GraduationCap className="h-4 w-4 text-purple-600" />
+                Upcoming Classes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {upcomingSessions.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  No upcoming classes.
+                </p>
+              ) : (
+                <SessionList sessions={upcomingSessions} />
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <GraduationCap className="h-4 w-4 text-purple-600" />
+                Past Classes (Last 30 Days)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {pastSessions.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-4 text-center">
+                  No past classes.
+                </p>
+              ) : (
+                <SessionList sessions={pastSessions} />
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
+    </div>
+  )
+}
+
+function SessionList({ sessions }: { sessions: ClassroomSessionWithRelations[] }) {
+  return (
+    <div className="space-y-3">
+      {sessions.map(session => {
+        const start = new Date(session.scheduled_at)
+        const enrolled = session.attendance?.length ?? 0
+
+        return (
+          <div key={session.id} className="border rounded-lg p-3 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-medium text-sm flex items-center gap-1.5">
+                  <GraduationCap className="h-3.5 w-3.5 text-purple-600 shrink-0" />
+                  {session.topic}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {format(start, 'MMM d, yyyy')} · {format(start, 'h:mm a')}
+                  <span className="mx-1.5">·</span>
+                  {session.duration_minutes} min
+                </p>
+                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Users className="h-3 w-3 shrink-0" />
+                  {enrolled}/{session.capacity} enrolled
+                </p>
+              </div>
+              <Badge variant={session.status === 'scheduled' ? 'default' : session.status === 'completed' ? 'secondary' : 'outline'} className="shrink-0">
+                {session.status}
+              </Badge>
+            </div>
+
+            {session.location && (
+              <div className="text-xs text-muted-foreground pt-1 border-t">
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(session.location)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-primary hover:underline"
+                >
+                  <MapPin className="h-3 w-3 shrink-0" />
+                  {session.location}
+                </a>
+              </div>
+            )}
+
+            {session.notes && (
+              <div className="text-xs text-muted-foreground pt-1 border-t">
+                <span className="font-medium">Notes:</span> {session.notes}
+              </div>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 }
