@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { format, addDays, startOfWeek, isSameDay } from 'date-fns'
-import { ChevronLeft, ChevronRight, MapPin, Clock, Car } from 'lucide-react'
+import { ChevronLeft, ChevronRight, MapPin, Clock, Car, GraduationCap, Users } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import type { LessonWithRelations, LessonStatus } from '@/types'
+import type { LessonWithRelations, ClassroomSessionWithRelations } from '@/types'
 
 // ── Constants ────────────────────────────────────────────────
 const HOUR_HEIGHT = 72
@@ -20,6 +20,14 @@ const STATUS_COLORS: Record<string, string> = {
   completed: 'bg-emerald-100 border-emerald-400 text-emerald-900',
   cancelled: 'bg-gray-100 border-gray-300 text-gray-400',
   no_show: 'bg-red-100 border-red-400 text-red-900',
+}
+
+// Classroom sessions get a distinct (purple) palette so they're easy to tell
+// apart from behind-the-wheel lessons.
+const CLASSROOM_COLORS: Record<string, string> = {
+  scheduled: 'bg-purple-100 border-purple-400 text-purple-900',
+  completed: 'bg-violet-100 border-violet-400 text-violet-900',
+  cancelled: 'bg-gray-100 border-gray-300 text-gray-400',
 }
 
 function formatHour(hour: number): string {
@@ -46,8 +54,10 @@ export function InstructorCalendar({ instructorId, bufferMinutes }: InstructorCa
     startOfWeek(new Date(), { weekStartsOn: 1 })
   )
   const [lessons, setLessons] = useState<LessonWithRelations[]>([])
+  const [sessions, setSessions] = useState<ClassroomSessionWithRelations[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedLesson, setSelectedLesson] = useState<LessonWithRelations | null>(null)
+  const [selectedSession, setSelectedSession] = useState<ClassroomSessionWithRelations | null>(null)
 
   const weekEnd = addDays(weekStart, 7)
   const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i))
@@ -60,16 +70,26 @@ export function InstructorCalendar({ instructorId, bufferMinutes }: InstructorCa
     async function load() {
       setLoading(true)
       try {
-        const res = await fetch(
-          `/api/lessons?start=${weekStart.toISOString()}&end=${weekEnd.toISOString()}`
-        )
-        if (res.ok && !cancelled) {
-          const data = await res.json()
+        const [lessonsRes, sessionsRes] = await Promise.all([
+          fetch(`/api/lessons?start=${weekStart.toISOString()}&end=${weekEnd.toISOString()}`),
+          fetch(`/api/classroom?start=${weekStart.toISOString()}&end=${weekEnd.toISOString()}`),
+        ])
+        if (cancelled) return
+        if (lessonsRes.ok) {
+          const data = await lessonsRes.json()
           // Filter to this instructor's lessons only
           const mine = (data.lessons ?? []).filter(
             (l: LessonWithRelations) => l.instructor_id === instructorId
           )
           setLessons(mine)
+        }
+        if (sessionsRes.ok) {
+          const data = await sessionsRes.json()
+          // Only the classroom sessions this instructor is teaching
+          const mine = (data.sessions ?? []).filter(
+            (s: ClassroomSessionWithRelations) => s.instructor_id === instructorId
+          )
+          setSessions(mine)
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -95,11 +115,27 @@ export function InstructorCalendar({ instructorId, bufferMinutes }: InstructorCa
     return map
   }, [lessons])
 
+  // Classroom sessions grouped by day
+  const sessionsByDay = useMemo(() => {
+    const map = new Map<string, ClassroomSessionWithRelations[]>()
+    for (const session of sessions) {
+      const key = format(new Date(session.scheduled_at), 'yyyy-MM-dd')
+      const arr = map.get(key) ?? []
+      arr.push(session)
+      map.set(key, arr)
+    }
+    for (const arr of map.values()) {
+      arr.sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
+    }
+    return map
+  }, [sessions])
+
   // Week stats
   const weekLessonCount = lessons.filter(l => l.status === 'scheduled' || l.status === 'completed').length
   const weekHours = lessons
     .filter(l => l.status === 'scheduled' || l.status === 'completed')
     .reduce((sum, l) => sum + l.duration_minutes, 0) / 60
+  const weekSessionCount = sessions.filter(s => s.status === 'scheduled' || s.status === 'completed').length
 
   // Navigation
   function goToPrevWeek() {
@@ -113,11 +149,11 @@ export function InstructorCalendar({ instructorId, bufferMinutes }: InstructorCa
   }
 
   // Position helpers
-  function getPosition(lesson: LessonWithRelations) {
-    const start = new Date(lesson.scheduled_at)
+  function getPosition(item: { scheduled_at: string; duration_minutes: number }) {
+    const start = new Date(item.scheduled_at)
     const startMins = start.getHours() * 60 + start.getMinutes()
     const top = (startMins - START_HOUR * 60) * PX_PER_MIN
-    const height = Math.max(lesson.duration_minutes * PX_PER_MIN, 28)
+    const height = Math.max(item.duration_minutes * PX_PER_MIN, 28)
     return { top, height }
   }
 
@@ -174,6 +210,12 @@ export function InstructorCalendar({ instructorId, bufferMinutes }: InstructorCa
           <Badge variant="secondary" className="gap-1">
             {weekHours.toFixed(1)} hrs
           </Badge>
+          {weekSessionCount > 0 && (
+            <Badge className="gap-1 bg-purple-100 text-purple-900 hover:bg-purple-100 border border-purple-300">
+              <GraduationCap className="h-3 w-3" />
+              {weekSessionCount} class{weekSessionCount !== 1 ? 'es' : ''}
+            </Badge>
+          )}
           {bufferMinutes > 0 && (
             <Badge variant="outline" className="gap-1 text-muted-foreground">
               <Car className="h-3 w-3" />
@@ -206,6 +248,7 @@ export function InstructorCalendar({ instructorId, bufferMinutes }: InstructorCa
           const isToday = isSameDay(day, today)
           const dateKey = format(day, 'yyyy-MM-dd')
           const dayLessons = lessonsByDay.get(dateKey) ?? []
+          const daySessions = sessionsByDay.get(dateKey) ?? []
           const scheduledCount = dayLessons.filter(l => l.status === 'scheduled' || l.status === 'completed').length
           const bufferBlocks = getBufferBlocks(dayLessons)
 
@@ -301,6 +344,39 @@ export function InstructorCalendar({ instructorId, bufferMinutes }: InstructorCa
                   )
                 })}
 
+                {/* Classroom session blocks */}
+                {daySessions.map(session => {
+                  const { top, height } = getPosition(session)
+                  const colorClass = CLASSROOM_COLORS[session.status] ?? CLASSROOM_COLORS.scheduled
+                  const start = new Date(session.scheduled_at)
+                  const enrolled = session.attendance?.length ?? 0
+
+                  return (
+                    <button
+                      key={session.id}
+                      onClick={() => setSelectedSession(selectedSession?.id === session.id ? null : session)}
+                      className={`absolute left-1 right-1 rounded border text-left px-1.5 py-0.5 text-xs overflow-hidden hover:brightness-95 transition-all ${colorClass}`}
+                      style={{ top, height }}
+                    >
+                      <div className="font-semibold truncate leading-tight flex items-center gap-0.5">
+                        <GraduationCap className="h-2.5 w-2.5 shrink-0" />
+                        {session.topic}
+                      </div>
+                      {height >= 36 && (
+                        <div className="truncate text-[10px] opacity-80 leading-tight">
+                          {formatTime(start.getHours(), start.getMinutes())} · {session.duration_minutes}m
+                        </div>
+                      )}
+                      {height >= 52 && (
+                        <div className="truncate text-[10px] opacity-60 leading-tight flex items-center gap-0.5">
+                          <Users className="h-2 w-2 shrink-0" />
+                          {enrolled}/{session.capacity}
+                        </div>
+                      )}
+                    </button>
+                  )
+                })}
+
                 {/* Current time line */}
                 {isToday && (() => {
                   const nowMins = today.getHours() * 60 + today.getMinutes()
@@ -327,6 +403,14 @@ export function InstructorCalendar({ instructorId, bufferMinutes }: InstructorCa
           lesson={selectedLesson}
           bufferMinutes={bufferMinutes}
           onClose={() => setSelectedLesson(null)}
+        />
+      )}
+
+      {/* Classroom session detail panel */}
+      {selectedSession && (
+        <ClassroomDetailPanel
+          session={selectedSession}
+          onClose={() => setSelectedSession(null)}
         />
       )}
     </div>
@@ -415,6 +499,84 @@ function LessonDetailPanel({
           {lesson.notes_covered && <p><span className="font-medium">Covered:</span> {lesson.notes_covered}</p>}
           {lesson.notes_practice && <p><span className="font-medium">Practice:</span> {lesson.notes_practice}</p>}
           {lesson.notes_additional && <p><span className="font-medium">Notes:</span> {lesson.notes_additional}</p>}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Classroom session detail panel ──────────────────────────
+function ClassroomDetailPanel({
+  session,
+  onClose,
+}: {
+  session: ClassroomSessionWithRelations
+  onClose: () => void
+}) {
+  const start = new Date(session.scheduled_at)
+  const end = new Date(start.getTime() + session.duration_minutes * 60000)
+  const enrolled = session.attendance ?? []
+
+  return (
+    <div className="border rounded-lg p-4 bg-background shadow-sm space-y-3">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <p className="font-semibold flex items-center gap-1.5">
+            <GraduationCap className="h-4 w-4 text-purple-600" />
+            {session.topic}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {format(start, 'EEEE, MMMM d')} · {format(start, 'h:mm a')} – {format(end, 'h:mm a')}
+            <span className="mx-1">·</span>{session.duration_minutes} min
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <Badge variant={
+            session.status === 'scheduled' ? 'default' :
+            session.status === 'completed' ? 'secondary' : 'outline'
+          }>
+            {session.status}
+          </Badge>
+          <Button variant="ghost" size="sm" onClick={onClose} className="h-7 px-2 text-xs">
+            Close
+          </Button>
+        </div>
+      </div>
+
+      {/* Location + capacity */}
+      <div className="flex flex-col sm:flex-row gap-2 text-sm">
+        {session.location && (
+          <a
+            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(session.location)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-1.5 text-primary hover:underline"
+          >
+            <MapPin className="h-3.5 w-3.5 shrink-0" />
+            <span className="truncate">{session.location}</span>
+          </a>
+        )}
+        <span className="flex items-center gap-1.5 text-muted-foreground">
+          <Users className="h-3.5 w-3.5 shrink-0" />
+          {enrolled.length}/{session.capacity} enrolled
+        </span>
+      </div>
+
+      {/* Enrolled students */}
+      {enrolled.length > 0 && (
+        <div className="text-xs text-muted-foreground space-y-0.5 pt-2 border-t">
+          {enrolled.map(a => (
+            <p key={a.id} className="truncate">
+              {a.student.user.first_name} {a.student.user.last_name}
+            </p>
+          ))}
+        </div>
+      )}
+
+      {/* Notes */}
+      {session.notes && (
+        <div className="text-xs text-muted-foreground pt-2 border-t">
+          <span className="font-medium">Notes:</span> {session.notes}
         </div>
       )}
     </div>
