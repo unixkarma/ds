@@ -16,9 +16,9 @@ Toda la verificación es **por UI**. No requiere acceso a Supabase ni SQL.
 
 | Rol         | Nombre que verás en UI | Email                              | Password   |
 | ----------- | ---------------------- | ---------------------------------- | ---------- |
-| Admin       | (admin)                | `admin63@helixdriving.com`         | `demo1234` |
-| Instructor  | Carlos Martinez        | `carlos.martinez@helixdriving.com` | `demo1234` |
-| Student     | Sofia Ramirez          | `sofia.ramirez@gmail.com`          | `demo1234` |
+| Admin       | (admin)                | `admin63@helixdriving.com`         | `Lemat4444` |
+| Instructor  | Carlos Martinez        | `carlos.martinez@helixdriving.com` | `Lemat4444` |
+| Student     | Sofia Ramirez          | `sofia.ramirez@gmail.com`          | `Lemat4444` |
 
 > ⚠️ **Solo para preview/QA.** Antes de onboardear clientes reales, rotar passwords o eliminar estas cuentas de testing.
 
