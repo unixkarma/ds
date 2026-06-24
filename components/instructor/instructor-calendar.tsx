@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { format, addDays, startOfWeek, isSameDay } from 'date-fns'
-import { ChevronLeft, ChevronRight, MapPin, Clock, Car, GraduationCap, Users } from 'lucide-react'
+import { ChevronLeft, ChevronRight, MapPin, Clock, Car, GraduationCap, Users, ClipboardList } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import type { LessonWithRelations, ClassroomSessionWithRelations } from '@/types'
+import type { LessonWithRelations, ClassroomSessionWithRelations, InstructorAssignmentWithInstructor } from '@/types'
 
 // ── Constants ────────────────────────────────────────────────
 const HOUR_HEIGHT = 72
@@ -27,6 +27,12 @@ const STATUS_COLORS: Record<string, string> = {
 const CLASSROOM_COLORS: Record<string, string> = {
   scheduled: 'bg-purple-100 border-purple-400 text-purple-900',
   completed: 'bg-violet-100 border-violet-400 text-violet-900',
+  cancelled: 'bg-gray-100 border-gray-300 text-gray-400',
+}
+
+const ASSIGNMENT_COLORS: Record<string, string> = {
+  scheduled: 'bg-amber-100 border-amber-400 text-amber-900',
+  completed: 'bg-amber-200 border-amber-500 text-amber-900',
   cancelled: 'bg-gray-100 border-gray-300 text-gray-400',
 }
 
@@ -55,6 +61,7 @@ export function InstructorCalendar({ instructorId, bufferMinutes }: InstructorCa
   )
   const [lessons, setLessons] = useState<LessonWithRelations[]>([])
   const [sessions, setSessions] = useState<ClassroomSessionWithRelations[]>([])
+  const [assignments, setAssignments] = useState<InstructorAssignmentWithInstructor[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedLesson, setSelectedLesson] = useState<LessonWithRelations | null>(null)
   const [selectedSession, setSelectedSession] = useState<ClassroomSessionWithRelations | null>(null)
@@ -70,9 +77,10 @@ export function InstructorCalendar({ instructorId, bufferMinutes }: InstructorCa
     async function load() {
       setLoading(true)
       try {
-        const [lessonsRes, sessionsRes] = await Promise.all([
+        const [lessonsRes, sessionsRes, assignmentsRes] = await Promise.all([
           fetch(`/api/lessons?start=${weekStart.toISOString()}&end=${weekEnd.toISOString()}`),
           fetch(`/api/classroom?start=${weekStart.toISOString()}&end=${weekEnd.toISOString()}`),
+          fetch(`/api/assignments?start=${weekStart.toISOString()}&end=${weekEnd.toISOString()}`),
         ])
         if (cancelled) return
         if (lessonsRes.ok) {
@@ -90,6 +98,13 @@ export function InstructorCalendar({ instructorId, bufferMinutes }: InstructorCa
             (s: ClassroomSessionWithRelations) => s.instructor_id === instructorId
           )
           setSessions(mine)
+        }
+        if (assignmentsRes.ok) {
+          const data = await assignmentsRes.json()
+          const mine = (data.assignments ?? []).filter(
+            (a: InstructorAssignmentWithInstructor) => a.instructor_id === instructorId
+          )
+          setAssignments(mine)
         }
       } finally {
         if (!cancelled) setLoading(false)
@@ -129,6 +144,21 @@ export function InstructorCalendar({ instructorId, bufferMinutes }: InstructorCa
     }
     return map
   }, [sessions])
+
+  // Assignments grouped by day
+  const assignmentsByDay = useMemo(() => {
+    const map = new Map<string, InstructorAssignmentWithInstructor[]>()
+    for (const a of assignments) {
+      const key = format(new Date(a.scheduled_at), 'yyyy-MM-dd')
+      const arr = map.get(key) ?? []
+      arr.push(a)
+      map.set(key, arr)
+    }
+    for (const arr of map.values()) {
+      arr.sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
+    }
+    return map
+  }, [assignments])
 
   // Week stats
   const weekLessonCount = lessons.filter(l => l.status === 'scheduled' || l.status === 'completed').length
@@ -249,6 +279,7 @@ export function InstructorCalendar({ instructorId, bufferMinutes }: InstructorCa
           const dateKey = format(day, 'yyyy-MM-dd')
           const dayLessons = lessonsByDay.get(dateKey) ?? []
           const daySessions = sessionsByDay.get(dateKey) ?? []
+          const dayAssignments = assignmentsByDay.get(dateKey) ?? []
           const scheduledCount = dayLessons.filter(l => l.status === 'scheduled' || l.status === 'completed').length
           const bufferBlocks = getBufferBlocks(dayLessons)
 
@@ -374,6 +405,31 @@ export function InstructorCalendar({ instructorId, bufferMinutes }: InstructorCa
                         </div>
                       )}
                     </button>
+                  )
+                })}
+
+                {/* Assignment blocks */}
+                {dayAssignments.map(a => {
+                  const { top, height } = getPosition(a)
+                  const colorClass = ASSIGNMENT_COLORS[a.status] ?? ASSIGNMENT_COLORS.scheduled
+                  const start = new Date(a.scheduled_at)
+                  return (
+                    <div
+                      key={a.id}
+                      title={`${a.detail || 'Assignment'} · ${a.duration_minutes}m · ${a.status}`}
+                      className={`absolute left-1 right-1 rounded border text-left px-1.5 py-0.5 text-xs overflow-hidden pointer-events-none ${colorClass}`}
+                      style={{ top, height, zIndex: 4 }}
+                    >
+                      <div className="font-semibold truncate leading-tight flex items-center gap-0.5">
+                        <ClipboardList className="h-2.5 w-2.5 shrink-0" />
+                        {a.detail || 'Assignment'}
+                      </div>
+                      {height >= 36 && (
+                        <div className="truncate text-[10px] opacity-80 leading-tight">
+                          {formatTime(start.getHours(), start.getMinutes())} · {a.duration_minutes}m
+                        </div>
+                      )}
+                    </div>
                   )
                 })}
 

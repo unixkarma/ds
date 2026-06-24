@@ -59,7 +59,14 @@ export function ReportsClient({ data }: ReportsClientProps) {
       </TabsContent>
 
       <TabsContent value="payroll" className="mt-6">
-        <InstructorPayrollReport instructors={data.instructors} lessons={data.lessons} />
+        <InstructorPayrollReport
+          instructors={data.instructors}
+          lessons={data.lessons}
+          purchases={data.purchases}
+          assignments={data.assignments}
+          deductions={data.deductions}
+          reimbursements={data.reimbursements}
+        />
       </TabsContent>
     </Tabs>
   )

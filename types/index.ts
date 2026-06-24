@@ -177,6 +177,9 @@ export interface Lesson {
   cancellation_fee_cents: number
   no_show_fee_cents: number
   opening_id: string | null
+  completed_at: string | null
+  cancelled_at: string | null
+  no_show_at: string | null
   created_at: string
 }
 
@@ -312,6 +315,64 @@ export interface InstructorApplication {
   reviewed_by: string | null
   reviewed_at: string | null
   created_at: string
+}
+
+// ── Instructor payroll extras (assignments / deductions / reimbursements) ──
+export type AssignmentStatus = 'scheduled' | 'completed' | 'cancelled'
+
+export interface InstructorAssignment {
+  id: string
+  school_id: string
+  instructor_id: string
+  scheduled_at: string          // date + time of the activity
+  duration_minutes: number
+  detail: string
+  status: AssignmentStatus
+  earning_cents: number         // paid at the instructor's hourly rate on completion
+  created_by: string | null
+  created_at: string
+}
+
+export interface InstructorAssignmentWithInstructor extends InstructorAssignment {
+  instructor: InstructorWithUser
+}
+
+export type DeductionType = 'car_insurance' | 'personal_insurance' | 'other'
+
+export interface InstructorDeduction {
+  id: string
+  school_id: string
+  instructor_id: string
+  date: string                  // YYYY-MM-DD
+  type: DeductionType
+  amount_cents: number
+  detail: string
+  created_by: string | null
+  created_at: string
+}
+
+export interface InstructorDeductionWithInstructor extends InstructorDeduction {
+  instructor: InstructorWithUser
+}
+
+export type ReimbursementStatus = 'pending' | 'approved' | 'rejected' | 'paid'
+
+export interface InstructorReimbursement {
+  id: string
+  school_id: string
+  instructor_id: string
+  date: string                  // YYYY-MM-DD
+  amount_cents: number
+  detail: string
+  evidence_path: string | null  // storage path in reimbursement-evidence bucket
+  status: ReimbursementStatus
+  reviewed_by: string | null
+  reviewed_at: string | null
+  created_at: string
+}
+
+export interface InstructorReimbursementWithInstructor extends InstructorReimbursement {
+  instructor: InstructorWithUser
 }
 
 // Dashboard summary card data

@@ -1,14 +1,15 @@
 import { redirect } from 'next/navigation'
 import { format } from 'date-fns'
-import { GraduationCap, MapPin, Users } from 'lucide-react'
+import { GraduationCap, MapPin, Users, ClipboardList } from 'lucide-react'
 
 import { getInstructorPortalData } from '@/lib/services/instructor-portal'
 import { listClassroomSessions } from '@/lib/services/classroom'
+import { listAssignmentsForInstructor } from '@/lib/services/instructor-extras'
 import { createClient } from '@/lib/supabase/server'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { LessonActions } from '@/components/instructor/lesson-actions'
-import type { LessonWithRelations, LessonStatus, ClassroomSessionWithRelations } from '@/types'
+import type { LessonWithRelations, LessonStatus, ClassroomSessionWithRelations, InstructorAssignment } from '@/types'
 
 const STATUS_BADGE: Record<LessonStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   scheduled: 'default',
@@ -48,6 +49,9 @@ export default async function InstructorSchedulePage() {
     fromDate: thirtyDaysAgo,
   })
 
+  // Assignments for this instructor
+  const allAssignments = await listAssignmentsForInstructor(instructor.id)
+
   // Split into upcoming and past
   const now = new Date()
   const upcoming = allLessons
@@ -61,6 +65,9 @@ export default async function InstructorSchedulePage() {
     .sort((a, b) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())
   const pastSessions = allSessions
     .filter(s => new Date(s.scheduled_at) < now || s.status !== 'scheduled')
+    .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime())
+  const sortedAssignments = allAssignments
+    .slice()
     .sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime())
 
   return (
@@ -104,6 +111,21 @@ export default async function InstructorSchedulePage() {
         </CardContent>
       </Card>
 
+      {/* Assignments */}
+      {sortedAssignments.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center gap-2">
+              <ClipboardList className="h-4 w-4 text-amber-600" />
+              Assignments
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <AssignmentList assignments={sortedAssignments} />
+          </CardContent>
+        </Card>
+      )}
+
       {/* Classroom sessions — only shown to instructors who teach classes */}
       {allSessions.length > 0 && (
         <>
@@ -144,6 +166,39 @@ export default async function InstructorSchedulePage() {
           </Card>
         </>
       )}
+    </div>
+  )
+}
+
+function AssignmentList({ assignments }: { assignments: InstructorAssignment[] }) {
+  return (
+    <div className="space-y-3">
+      {assignments.map(a => {
+        const start = new Date(a.scheduled_at)
+        const h = Math.floor(a.duration_minutes / 60)
+        const m = a.duration_minutes % 60
+        const dur = h && m ? `${h}h ${m}m` : h ? `${h}h` : `${m}m`
+        return (
+          <div key={a.id} className="border rounded-lg p-3 space-y-2">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-medium text-sm flex items-center gap-1.5">
+                  <ClipboardList className="h-3.5 w-3.5 text-amber-600 shrink-0" />
+                  {a.detail || 'Assignment'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {format(start, 'MMM d, yyyy')} · {format(start, 'h:mm a')}
+                  <span className="mx-1.5">·</span>
+                  {dur}
+                </p>
+              </div>
+              <Badge variant={a.status === 'scheduled' ? 'default' : a.status === 'completed' ? 'secondary' : 'outline'} className="shrink-0">
+                {a.status}
+              </Badge>
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }

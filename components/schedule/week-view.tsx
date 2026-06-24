@@ -1,6 +1,6 @@
 'use client'
 
-import type { LessonWithRelations, Opening, InstructorWithUser } from '@/types'
+import type { LessonWithRelations, Opening, InstructorWithUser, InstructorAssignmentWithInstructor } from '@/types'
 
 const HOUR_HEIGHT = 80 // px per hour
 const START_HOUR = 7   // 7:00 AM
@@ -22,6 +22,13 @@ const OPENING_COLORS: Record<string, string> = {
   blocked: 'bg-zinc-100/60 border-zinc-300 border-dashed text-zinc-500',
 }
 
+// Assignments get a distinct (amber) palette so they stand apart from lessons.
+const ASSIGNMENT_COLORS: Record<string, string> = {
+  scheduled: 'bg-amber-100 border-amber-400 text-amber-900',
+  completed: 'bg-amber-200 border-amber-500 text-amber-900',
+  cancelled: 'bg-gray-100 border-gray-300 text-gray-400',
+}
+
 function formatHour(hour: number): string {
   if (hour === 12) return '12 PM'
   if (hour > 12) return `${hour - 12} PM`
@@ -31,12 +38,13 @@ function formatHour(hour: number): string {
 interface WeekViewProps {
   lessons: LessonWithRelations[]
   openings?: Opening[]
+  assignments?: InstructorAssignmentWithInstructor[]
   weekStart: Date // Monday of the displayed week
   onLessonClick: (lesson: LessonWithRelations) => void
   instructors?: InstructorWithUser[] // optional, used to label openings with instructor name
 }
 
-export function WeekView({ lessons, openings = [], weekStart, onLessonClick, instructors = [] }: WeekViewProps) {
+export function WeekView({ lessons, openings = [], assignments = [], weekStart, onLessonClick, instructors = [] }: WeekViewProps) {
   const instructorById = new Map(instructors.map(i => [i.id, i]))
   // Build Mon–Sun array for this week
   const days = Array.from({ length: 7 }, (_, i) => {
@@ -62,6 +70,10 @@ export function WeekView({ lessons, openings = [], weekStart, onLessonClick, ins
 
   function getOpeningsForDay(day: Date): Opening[] {
     return openings.filter(o => isSameDay(o.scheduled_at, day))
+  }
+
+  function getAssignmentsForDay(day: Date): InstructorAssignmentWithInstructor[] {
+    return assignments.filter(a => isSameDay(a.scheduled_at, day))
   }
 
   function getPosition(scheduled_at: string, duration_minutes: number) {
@@ -190,6 +202,28 @@ export function WeekView({ lessons, openings = [], weekStart, onLessonClick, ins
                       </div>
                     )}
                   </button>
+                )
+              })}
+
+              {/* Assignments — distinct amber blocks */}
+              {getAssignmentsForDay(day).map(a => {
+                const { top, height } = getPosition(a.scheduled_at, a.duration_minutes)
+                const colorClass = ASSIGNMENT_COLORS[a.status] ?? ASSIGNMENT_COLORS.scheduled
+                const inst = instructorById.get(a.instructor_id)
+                return (
+                  <div
+                    key={`a-${a.id}`}
+                    title={`${a.detail || 'Assignment'}${inst ? ` · ${inst.user.first_name} ${inst.user.last_name}` : ''} · ${a.duration_minutes} min · ${a.status}`}
+                    className={`absolute left-1 right-1 rounded border text-left px-1.5 py-1 text-[10px] overflow-hidden pointer-events-none ${colorClass}`}
+                    style={{ top, height, zIndex: 3 }}
+                  >
+                    <div className="font-semibold truncate leading-tight">📋 {a.detail || 'Assignment'}</div>
+                    {inst && height >= 32 && (
+                      <div className="truncate opacity-75 leading-tight">
+                        {inst.user.first_name} {inst.user.last_name}
+                      </div>
+                    )}
+                  </div>
                 )
               })}
             </div>

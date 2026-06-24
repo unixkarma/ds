@@ -17,7 +17,7 @@ import { WeekView } from '@/components/schedule/week-view'
 import { MultiInstructorView } from '@/components/schedule/multi-instructor-view'
 import { BookLessonDialog } from '@/components/schedule/book-lesson-dialog'
 import { LessonDetailDialog } from '@/components/schedule/lesson-detail-dialog'
-import type { LessonWithRelations, StudentWithUser, InstructorWithUser, Vehicle, Opening } from '@/types'
+import type { LessonWithRelations, StudentWithUser, InstructorWithUser, Vehicle, Opening, InstructorAssignmentWithInstructor } from '@/types'
 
 type ViewMode = 'single' | 'multi'
 
@@ -33,6 +33,7 @@ function getWeekStart(date: Date): Date {
 interface ScheduleClientProps {
   initialLessons: LessonWithRelations[]
   initialOpenings: Opening[]
+  initialAssignments: InstructorAssignmentWithInstructor[]
   initialWeekStart: string
   students: StudentWithUser[]
   instructors: InstructorWithUser[]
@@ -42,6 +43,7 @@ interface ScheduleClientProps {
 export function ScheduleClient({
   initialLessons,
   initialOpenings,
+  initialAssignments,
   initialWeekStart,
   students,
   instructors,
@@ -52,6 +54,7 @@ export function ScheduleClient({
   const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [lessons, setLessons] = useState<LessonWithRelations[]>(initialLessons)
   const [openings, setOpenings] = useState<Opening[]>(initialOpenings)
+  const [assignments, setAssignments] = useState<InstructorAssignmentWithInstructor[]>(initialAssignments)
   const [isLoadingWeek, setIsLoadingWeek] = useState(false)
   const [bookingOpen, setBookingOpen] = useState(false)
   const [selectedLesson, setSelectedLesson] = useState<LessonWithRelations | null>(null)
@@ -82,15 +85,21 @@ export function ScheduleClient({
     return openings.filter((o) => o.instructor_id === selectedInstructorId)
   }, [openings, selectedInstructorId, viewMode])
 
+  const filteredAssignments = useMemo(() => {
+    if (viewMode === 'multi' || selectedInstructorId === 'all') return assignments
+    return assignments.filter((a) => a.instructor_id === selectedInstructorId)
+  }, [assignments, selectedInstructorId, viewMode])
+
   // ── Data loading ────────────────────────────────────────────
   async function loadLessonsAndOpenings(start: Date, end: Date) {
     setIsLoadingWeek(true)
     try {
-      const [lessonsRes, openingsRes] = await Promise.all([
+      const [lessonsRes, openingsRes, assignmentsRes] = await Promise.all([
         fetch(`/api/lessons?start=${start.toISOString()}&end=${end.toISOString()}`),
         fetch(
           `/api/openings?start=${start.toISOString()}&end=${end.toISOString()}&status=available,blocked`
         ),
+        fetch(`/api/assignments?start=${start.toISOString()}&end=${end.toISOString()}`),
       ])
       if (lessonsRes.ok) {
         const data = await lessonsRes.json()
@@ -99,6 +108,10 @@ export function ScheduleClient({
       if (openingsRes.ok) {
         const data = await openingsRes.json()
         setOpenings(data.openings ?? [])
+      }
+      if (assignmentsRes.ok) {
+        const data = await assignmentsRes.json()
+        setAssignments(data.assignments ?? [])
       }
     } finally {
       setIsLoadingWeek(false)
@@ -288,6 +301,7 @@ export function ScheduleClient({
           <WeekView
             lessons={filteredLessons}
             openings={filteredOpenings}
+            assignments={filteredAssignments}
             weekStart={weekStart}
             onLessonClick={handleLessonClick}
             instructors={instructors}
@@ -296,6 +310,7 @@ export function ScheduleClient({
           <MultiInstructorView
             lessons={lessons}
             openings={openings}
+            assignments={assignments}
             instructors={instructors}
             selectedDate={selectedDate}
             onLessonClick={handleLessonClick}

@@ -84,6 +84,24 @@ export function RevenueReport({ payments, purchases }: RevenueReportProps) {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 
+  // Most recent payment per (student, package) — used to surface a payment date
+  // and method against each sale row. A sale paid over several installments
+  // shows its latest payment.
+  const paymentByPurchase = useMemo(() => {
+    const map = new Map<string, PaymentWithRelations>()
+    for (const pay of payments) {
+      const key = `${pay.student_id}|${pay.package_id ?? 'none'}`
+      const existing = map.get(key)
+      if (!existing || parseISO(pay.created_at) > parseISO(existing.created_at)) {
+        map.set(key, pay)
+      }
+    }
+    return map
+  }, [payments])
+
+  const paymentForPurchase = (p: StudentPurchaseWithRelations) =>
+    paymentByPurchase.get(`${p.student_id}|${p.package_id ?? 'none'}`) ?? null
+
   const inRange = (iso: string) => {
     const date = parseISO(iso)
     if (startDate && date < startOfDay(parseISO(startDate))) return false
@@ -139,10 +157,18 @@ export function RevenueReport({ payments, purchases }: RevenueReportProps) {
   const handleExport = () => {
     const columns: CSVColumn<StudentPurchaseWithRelations>[] = [
       { header: 'Sale Date', value: (p) => format(parseISO(p.created_at), 'yyyy-MM-dd') },
+      {
+        header: 'Payment Date',
+        value: (p) => {
+          const pay = paymentForPurchase(p)
+          return pay ? format(parseISO(pay.created_at), 'yyyy-MM-dd') : ''
+        },
+      },
       { header: 'Student', value: (p) => getFullName(p.student.user) },
       { header: 'Email', value: (p) => p.student.user.email ?? '' },
       { header: 'Package', value: (p) => p.package_name },
       { header: 'Sold By', value: (p) => soldByLabel(p) },
+      { header: 'Payment Method', value: (p) => methodLabel(paymentForPurchase(p)?.payment_method ?? null) },
       { header: 'Price', value: (p) => (p.price_cents / 100).toFixed(2) },
       { header: 'Discount', value: (p) => ((p.discount_cents ?? 0) / 100).toFixed(2) },
       { header: 'Amount Paid', value: (p) => (p.amount_paid_cents / 100).toFixed(2) },
@@ -316,9 +342,11 @@ export function RevenueReport({ payments, purchases }: RevenueReportProps) {
             <TableHeader>
               <TableRow>
                 <TableHead>Sale date</TableHead>
+                <TableHead>Payment date</TableHead>
                 <TableHead>Student</TableHead>
                 <TableHead>Package</TableHead>
                 <TableHead>Sold by</TableHead>
+                <TableHead>Method</TableHead>
                 <TableHead className="text-right">Price</TableHead>
                 <TableHead className="text-right">Discount</TableHead>
                 <TableHead className="text-right">Amount paid</TableHead>
@@ -330,10 +358,14 @@ export function RevenueReport({ payments, purchases }: RevenueReportProps) {
               {filteredPurchases.map(purchase => {
                 const balance = balanceCents(purchase)
                 const status = saleStatus(purchase)
+                const payment = paymentForPurchase(purchase)
                 return (
                   <TableRow key={purchase.id}>
                     <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                       {formatDate(purchase.created_at)}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                      {payment ? formatDate(payment.created_at) : '—'}
                     </TableCell>
                     <TableCell className="font-medium">
                       {getFullName(purchase.student.user)}
@@ -342,6 +374,9 @@ export function RevenueReport({ payments, purchases }: RevenueReportProps) {
                       {purchase.package_name}
                     </TableCell>
                     <TableCell className="text-sm">{soldByLabel(purchase)}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {payment ? methodLabel(payment.payment_method) : '—'}
+                    </TableCell>
                     <TableCell className="text-right">
                       {formatCurrency(purchase.price_cents)}
                     </TableCell>
