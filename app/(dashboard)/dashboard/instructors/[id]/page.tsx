@@ -4,14 +4,19 @@ import type { Metadata } from 'next'
 import { ChevronLeft, Mail, Phone, Hash, BookOpen, Pencil } from 'lucide-react'
 
 import { getInstructorById } from '@/lib/services/instructors'
+import {
+  listAssignmentsForInstructor,
+  listDeductionsForInstructor,
+  listReimbursementsForInstructor,
+} from '@/lib/services/instructor-extras'
 import { formatDateTime, getFullName } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import { InstructorStatusToggle } from '@/components/instructors/instructor-status-toggle'
 import { ResendInviteButton } from '@/components/instructors/resend-invite-button'
 import { DeleteInstructorButton } from '@/components/instructors/delete-instructor-button'
+import { InstructorDetailTabs } from '@/components/instructors/instructor-detail-tabs'
 import type { LessonStatus } from '@/types'
 
 export const metadata: Metadata = { title: 'Instructor Details' }
@@ -37,38 +42,14 @@ export default async function InstructorDetailPage({
     notFound()
   }
 
-  return (
-    <div className="max-w-4xl space-y-6">
-      <Link
-        href="/dashboard/instructors"
-        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        <ChevronLeft className="h-4 w-4" />
-        Back to Instructors
-      </Link>
+  const [assignments, deductions, reimbursements] = await Promise.all([
+    listAssignmentsForInstructor(id),
+    listDeductionsForInstructor(id),
+    listReimbursementsForInstructor(id),
+  ])
 
-      {/* Header */}
-      <div className="flex items-start justify-between gap-4 flex-wrap">
-        <div>
-          <h1 className="text-xl font-semibold">{getFullName(instructor.user)}</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">Instructor</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={instructor.is_active ? 'default' : 'secondary'}>
-            {instructor.is_active ? 'Active' : 'Inactive'}
-          </Badge>
-          <ResendInviteButton instructorId={id} />
-          <Link href={`/dashboard/instructors/${id}/edit`}>
-            <Button variant="outline" size="sm">
-              <Pencil className="mr-2 h-3.5 w-3.5" />
-              Edit
-            </Button>
-          </Link>
-          <InstructorStatusToggle instructor={instructor} />
-          <DeleteInstructorButton instructorId={id} instructorName={getFullName(instructor.user)} />
-        </div>
-      </div>
-
+  const overview = (
+    <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Profile card */}
         <Card className="md:col-span-2">
@@ -156,6 +137,48 @@ export default async function InstructorDetailPage({
           )}
         </CardContent>
       </Card>
+    </div>
+  )
+
+  return (
+    <div className="max-w-4xl space-y-6">
+      <Link
+        href="/dashboard/instructors"
+        className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
+      >
+        <ChevronLeft className="h-4 w-4" />
+        Back to Instructors
+      </Link>
+
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-xl font-semibold">{getFullName(instructor.user)}</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">Instructor</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant={instructor.is_active ? 'default' : 'secondary'}>
+            {instructor.is_active ? 'Active' : 'Inactive'}
+          </Badge>
+          <ResendInviteButton instructorId={id} />
+          <Link href={`/dashboard/instructors/${id}/edit`}>
+            <Button variant="outline" size="sm">
+              <Pencil className="mr-2 h-3.5 w-3.5" />
+              Edit
+            </Button>
+          </Link>
+          <InstructorStatusToggle instructor={instructor} />
+          <DeleteInstructorButton instructorId={id} instructorName={getFullName(instructor.user)} />
+        </div>
+      </div>
+
+      <InstructorDetailTabs
+        instructorId={id}
+        overview={overview}
+        assignments={assignments}
+        deductions={deductions}
+        reimbursements={reimbursements}
+      />
     </div>
   )
 }

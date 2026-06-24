@@ -167,6 +167,14 @@ export async function PATCH(
 
   const lessonUpdates: Record<string, unknown> = {}
   if (updates.status !== undefined) lessonUpdates.status = updates.status
+
+  // Stamp the transition time when the status changes to a terminal state.
+  if (updates.status !== undefined && updates.status !== existing.status) {
+    const nowIso = new Date().toISOString()
+    if (updates.status === 'completed') lessonUpdates.completed_at = nowIso
+    if (updates.status === 'cancelled') lessonUpdates.cancelled_at = nowIso
+    if (updates.status === 'no_show') lessonUpdates.no_show_at = nowIso
+  }
   if (updates.scheduledAt !== undefined) lessonUpdates.scheduled_at = updates.scheduledAt
   if (updates.durationMinutes !== undefined) lessonUpdates.duration_minutes = updates.durationMinutes
   if (updates.vehicleId !== undefined) lessonUpdates.vehicle_id = updates.vehicleId

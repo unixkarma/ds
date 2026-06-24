@@ -9,15 +9,17 @@ import {
   getWeekStart,
   getWeekEnd,
 } from '@/lib/services/schedule'
+import { getAssignmentsForRange } from '@/lib/services/instructor-extras'
 import { ScheduleClient } from '@/components/schedule/schedule-client'
 
 async function ScheduleContent() {
   const weekStart = getWeekStart(new Date())
   const weekEnd = getWeekEnd(weekStart)
 
-  const [lessons, openings, formData] = await Promise.all([
+  const [lessons, openings, assignments, formData] = await Promise.all([
     getLessonsForRange(weekStart, weekEnd),
     getOpeningsForRange(weekStart, weekEnd),
+    getAssignmentsForRange(weekStart, weekEnd),
     getBookingFormData(),
   ])
 
@@ -25,6 +27,7 @@ async function ScheduleContent() {
     <ScheduleClient
       initialLessons={lessons}
       initialOpenings={openings}
+      initialAssignments={assignments}
       initialWeekStart={weekStart.toISOString()}
       students={formData.students}
       instructors={formData.instructors}

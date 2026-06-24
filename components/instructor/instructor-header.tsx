@@ -32,6 +32,7 @@ const baseNavLinks = [
   { href: '/instructor/schedule', label: 'Schedule' },
   { href: '/instructor/availability', label: 'Availability' },
   { href: '/instructor/earnings', label: 'Earnings' },
+  { href: '/instructor/reimbursements', label: 'Reimbursements' },
 ]
 
 export function InstructorHeader({ user, schoolName, hasClassroomSessions = false }: InstructorHeaderProps) {

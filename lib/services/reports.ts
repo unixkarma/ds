@@ -4,6 +4,11 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { getBalancesForStudents } from '@/lib/services/student-ledger'
+import {
+  listAssignmentsForSchool,
+  listDeductionsForSchool,
+  listReimbursementsForSchool,
+} from '@/lib/services/instructor-extras'
 import type {
   LessonWithRelations,
   PaymentWithRelations,
@@ -11,6 +16,9 @@ import type {
   InstructorWithUser,
   ClassroomSessionWithRelations,
   StudentPurchaseWithRelations,
+  InstructorAssignmentWithInstructor,
+  InstructorDeductionWithInstructor,
+  InstructorReimbursementWithInstructor,
 } from '@/types'
 
 export interface ReportsData {
@@ -21,6 +29,9 @@ export interface ReportsData {
   instructors: InstructorWithUser[]
   studentBalances: Record<string, number>
   classroomSessions: ClassroomSessionWithRelations[]
+  assignments: InstructorAssignmentWithInstructor[]
+  deductions: InstructorDeductionWithInstructor[]
+  reimbursements: InstructorReimbursementWithInstructor[]
 }
 
 export async function getReportsData(): Promise<ReportsData> {
@@ -85,7 +96,12 @@ export async function getReportsData(): Promise<ReportsData> {
   if (classroomErr) throw new Error(classroomErr.message)
 
   const studentList = (students ?? []) as unknown as StudentWithUser[]
-  const balances = await getBalancesForStudents(studentList.map((s) => s.id))
+  const [balances, assignments, deductions, reimbursements] = await Promise.all([
+    getBalancesForStudents(studentList.map((s) => s.id)),
+    listAssignmentsForSchool(),
+    listDeductionsForSchool(),
+    listReimbursementsForSchool(),
+  ])
 
   return {
     lessons: (lessons ?? []) as unknown as LessonWithRelations[],
@@ -95,6 +111,9 @@ export async function getReportsData(): Promise<ReportsData> {
     instructors: (instructors ?? []) as unknown as InstructorWithUser[],
     studentBalances: Object.fromEntries(balances),
     classroomSessions: (classroomSessions ?? []) as unknown as ClassroomSessionWithRelations[],
+    assignments,
+    deductions,
+    reimbursements,
   }
 }
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { getFullName } from '@/lib/utils'
-import type { LessonWithRelations, InstructorWithUser, Opening } from '@/types'
+import type { LessonWithRelations, InstructorWithUser, Opening, InstructorAssignmentWithInstructor } from '@/types'
 
 const HOUR_HEIGHT = 80
 const START_HOUR = 7
@@ -21,6 +21,13 @@ const OPENING_COLORS: Record<string, string> = {
   blocked: 'bg-zinc-100/60 border-zinc-300 border-dashed text-zinc-500',
 }
 
+// Assignments get a distinct (amber) palette so they stand apart from lessons.
+const ASSIGNMENT_COLORS: Record<string, string> = {
+  scheduled: 'bg-amber-100 border-amber-400 text-amber-900',
+  completed: 'bg-amber-200 border-amber-500 text-amber-900',
+  cancelled: 'bg-gray-100 border-gray-300 text-gray-400',
+}
+
 function formatHour(hour: number): string {
   if (hour === 12) return '12 PM'
   if (hour > 12) return `${hour - 12} PM`
@@ -30,6 +37,7 @@ function formatHour(hour: number): string {
 interface MultiInstructorViewProps {
   lessons: LessonWithRelations[]
   openings?: Opening[]
+  assignments?: InstructorAssignmentWithInstructor[]
   instructors: InstructorWithUser[]
   selectedDate: Date
   onLessonClick: (lesson: LessonWithRelations) => void
@@ -38,6 +46,7 @@ interface MultiInstructorViewProps {
 export function MultiInstructorView({
   lessons,
   openings = [],
+  assignments = [],
   instructors,
   selectedDate,
   onLessonClick,
@@ -62,6 +71,12 @@ export function MultiInstructorView({
   function getOpeningsForInstructor(instructorId: string): Opening[] {
     return openings.filter(
       (o) => o.instructor_id === instructorId && isOnSelectedDay(o.scheduled_at)
+    )
+  }
+
+  function getAssignmentsForInstructor(instructorId: string): InstructorAssignmentWithInstructor[] {
+    return assignments.filter(
+      (a) => a.instructor_id === instructorId && isOnSelectedDay(a.scheduled_at)
     )
   }
 
@@ -168,6 +183,25 @@ export function MultiInstructorView({
                     </div>
                   )}
                 </button>
+              )
+            })}
+
+            {/* Assignments — distinct amber blocks */}
+            {getAssignmentsForInstructor(inst.id).map((a) => {
+              const { top, height } = getPosition(a.scheduled_at, a.duration_minutes)
+              const colorClass = ASSIGNMENT_COLORS[a.status] ?? ASSIGNMENT_COLORS.scheduled
+              return (
+                <div
+                  key={`a-${a.id}`}
+                  title={`${a.detail || 'Assignment'} · ${a.duration_minutes} min · ${a.status}`}
+                  className={`absolute left-1 right-1 rounded border text-left px-1.5 py-1 text-[10px] overflow-hidden pointer-events-none ${colorClass}`}
+                  style={{ top, height, zIndex: 3 }}
+                >
+                  <div className="font-semibold truncate leading-tight">📋 {a.detail || 'Assignment'}</div>
+                  {height >= 32 && (
+                    <div className="truncate opacity-75 leading-tight">{a.duration_minutes} min</div>
+                  )}
+                </div>
               )
             })}
           </div>
