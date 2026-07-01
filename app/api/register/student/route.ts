@@ -5,6 +5,8 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { serverError } from '@/lib/api-error'
+import { checkRateLimit, clientIp } from '@/lib/rate-limit'
 
 const registrationSchema = z.object({
   registrationCode: z.string().min(1, 'Registration code is required'),
@@ -37,6 +39,14 @@ const registrationSchema = z.object({
 })
 
 export async function POST(request: NextRequest) {
+  const { success } = await checkRateLimit('register', clientIp(request))
+  if (!success) {
+    return NextResponse.json(
+      { error: 'Too many attempts. Please try again later.' },
+      { status: 429 }
+    )
+  }
+
   const body = await request.json()
   const parsed = registrationSchema.safeParse(body)
 
@@ -88,10 +98,7 @@ export async function POST(request: NextRequest) {
   })
 
   if (authError || !authData.user) {
-    return NextResponse.json(
-      { error: authError?.message ?? 'Failed to create account' },
-      { status: 500 }
-    )
+    return serverError('register/student: createUser', authError)
   }
 
   const userId = authData.user.id
@@ -116,10 +123,7 @@ export async function POST(request: NextRequest) {
   if (userError) {
     // Rollback: delete the auth user
     await adminClient.auth.admin.deleteUser(userId)
-    return NextResponse.json(
-      { error: 'Failed to create user profile: ' + userError.message },
-      { status: 500 }
-    )
+    return serverError('register/student: users insert', userError)
   }
 
   // Create students row
@@ -144,10 +148,7 @@ export async function POST(request: NextRequest) {
     // Rollback: delete user + auth
     await adminClient.from('users').delete().eq('id', userId)
     await adminClient.auth.admin.deleteUser(userId)
-    return NextResponse.json(
-      { error: 'Failed to create student record: ' + studentError.message },
-      { status: 500 }
-    )
+    return serverError('register/student: students insert', studentError)
   }
 
   return NextResponse.json({ success: true, schoolName: school.name }, { status: 201 })

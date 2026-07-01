@@ -13,7 +13,8 @@ export const config = {
      * - _next/image (image optimization)
      * - favicon.ico, sitemap.xml, robots.txt
      * - /api/stripe/webhook (Stripe webhook must not require auth)
+     * - /api/health (public liveness probe)
      */
-    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|api/stripe/webhook|api/register/student|api/instructor-applications|apply).*)',
+    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|api/stripe/webhook|api/register/student|api/instructor-applications|api/health|apply).*)',
   ],
 }

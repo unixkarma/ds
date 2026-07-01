@@ -3,6 +3,8 @@
 
 import { NextResponse, type NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { serverError } from '@/lib/api-error'
+import { checkRateLimit, clientIp } from '@/lib/rate-limit'
 
 const ALLOWED_DOC_TYPES = [
   'application/pdf',
@@ -13,6 +15,14 @@ const ALLOWED_DOC_TYPES = [
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10 MB
 
 export async function POST(request: NextRequest) {
+  const { success } = await checkRateLimit('application', clientIp(request))
+  if (!success) {
+    return NextResponse.json(
+      { error: 'Too many attempts. Please try again later.' },
+      { status: 429 }
+    )
+  }
+
   const formData = await request.formData()
 
   // Extract fields
@@ -115,10 +125,7 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (insertError || !application) {
-    return NextResponse.json(
-      { error: 'Failed to create application: ' + (insertError?.message ?? 'Unknown error') },
-      { status: 500 }
-    )
+    return serverError('instructor-applications: insert', insertError)
   }
 
   const appId = application.id
