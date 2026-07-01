@@ -318,9 +318,14 @@ END;
 $$;
 
 -- ── Permissions: service_role only ───────────────────────────
-REVOKE ALL ON FUNCTION record_package_purchase(uuid,uuid,uuid,text,int,bigint,bigint,bigint,bigint,int,text,text,text,text,text,text,text,text,uuid,uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION record_balance_payment(uuid,uuid,bigint,bigint,text,text,text,text,text,text,text,text,uuid,uuid) FROM PUBLIC;
-REVOKE ALL ON FUNCTION record_custom_payment(uuid,uuid,int,bigint,text,text,text,uuid,uuid) FROM PUBLIC;
+-- Revoke from anon + authenticated explicitly, not just PUBLIC: Supabase's
+-- default privileges grant EXECUTE on new public functions directly to those
+-- roles, and a revoke from PUBLIC does not remove a direct grant. Without this
+-- any anon/authenticated caller could invoke these SECURITY DEFINER RPCs via
+-- PostgREST and forge billing. (See migration 040 — same fix, applied to prod.)
+REVOKE ALL ON FUNCTION record_package_purchase(uuid,uuid,uuid,text,int,bigint,bigint,bigint,bigint,int,text,text,text,text,text,text,text,text,uuid,uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION record_balance_payment(uuid,uuid,bigint,bigint,text,text,text,text,text,text,text,text,uuid,uuid) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION record_custom_payment(uuid,uuid,int,bigint,text,text,text,uuid,uuid) FROM PUBLIC, anon, authenticated;
 
 GRANT EXECUTE ON FUNCTION record_package_purchase(uuid,uuid,uuid,text,int,bigint,bigint,bigint,bigint,int,text,text,text,text,text,text,text,text,uuid,uuid) TO service_role;
 GRANT EXECUTE ON FUNCTION record_balance_payment(uuid,uuid,bigint,bigint,text,text,text,text,text,text,text,text,uuid,uuid) TO service_role;
