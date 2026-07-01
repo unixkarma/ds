@@ -8,6 +8,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { createClient } from '@/lib/supabase/server'
 import type {
   StudentLedgerEntry,
+  StudentLedgerEntryWithStudent,
   LedgerEntryType,
   LedgerPaymentMethod,
 } from '@/types'
@@ -37,6 +38,21 @@ export async function getStudentLedger(
 
   if (error) throw new Error(error.message)
   return (data ?? []) as StudentLedgerEntry[]
+}
+
+// Full ledger for the school (every charge/payment/adjustment, with the
+// student attached) — drives the per-transaction view in the revenue report.
+// Ordered oldest-first so callers can accumulate a running balance per student.
+// RLS scopes this to the admin's own school.
+export async function getLedgerForSchool(): Promise<StudentLedgerEntryWithStudent[]> {
+  const supabase = await createClient()
+  const { data, error } = await supabase
+    .from('student_ledger')
+    .select('*, student:students(*, user:users!user_id(*))')
+    .order('created_at', { ascending: true })
+
+  if (error) throw new Error(error.message)
+  return (data ?? []) as unknown as StudentLedgerEntryWithStudent[]
 }
 
 // Batch balance lookup for reports — returns Map<studentId, balanceCents>.

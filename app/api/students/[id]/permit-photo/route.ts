@@ -62,10 +62,13 @@ export async function POST(
 
   // Get the student's user_id for the storage path
   const adminClient = createAdminClient()
+  // Scope to the caller's school — the admin branch otherwise trusts the URL
+  // `studentId` and would let an admin overwrite another school's permit photo.
   const { data: student } = await adminClient
     .from('students')
     .select('user_id')
     .eq('id', studentId)
+    .eq('school_id', profile.school_id)
     .single()
 
   if (!student) {

@@ -67,13 +67,53 @@ export async function PATCH(
 
   const updates = parsed.data
 
-  // If rescheduling, run conflict detection for the new time
-  if (updates.scheduledAt) {
-    const newStart = new Date(updates.scheduledAt)
+  // Status state machine: terminal states (completed/cancelled/no_show) may only
+  // be entered from `scheduled`. Re-transitioning between terminal states (e.g.
+  // no_show → completed) would re-run earnings/counter side-effects without
+  // reversing the credit refund already applied — effectively a free lesson.
+  if (
+    updates.status !== undefined &&
+    updates.status !== existing.status &&
+    existing.status !== 'scheduled'
+  ) {
+    return NextResponse.json(
+      {
+        error: `Cannot change a ${existing.status} lesson to ${updates.status}. Only scheduled lessons can be completed, cancelled or marked no-show.`,
+      },
+      { status: 409 }
+    )
+  }
+
+  // Re-validate conflicts/travel whenever the lesson's footprint changes —
+  // either its start time (reschedule) or its duration (a longer lesson can
+  // eat into the next lesson's buffer/travel gap).
+  if (updates.scheduledAt || updates.durationMinutes) {
+    const newStart = new Date(updates.scheduledAt ?? existing.scheduled_at)
     const newDuration = updates.durationMinutes ?? existing.duration_minutes
     const newEnd = new Date(newStart.getTime() + newDuration * 60 * 1000)
     const newPickup = updates.pickupLocation ?? existing.pickup_location
     const newDropoff = updates.dropoffLocation ?? existing.dropoff_location
+
+    // Enforce the school's max-booking-days-ahead window on the NEW start time,
+    // but only when the start time is actually changing (a duration-only edit
+    // doesn't move the date).
+    if (updates.scheduledAt) {
+      const { data: school } = await supabase
+        .from('schools')
+        .select('max_booking_days_ahead')
+        .eq('id', profile.school_id)
+        .single()
+      if (school) {
+        const maxDate = new Date()
+        maxDate.setDate(maxDate.getDate() + school.max_booking_days_ahead)
+        if (newStart > maxDate) {
+          return NextResponse.json(
+            { error: `Cannot reschedule more than ${school.max_booking_days_ahead} days in advance.` },
+            { status: 400 }
+          )
+        }
+      }
+    }
 
     const dayStart = new Date(newStart)
     dayStart.setHours(0, 0, 0, 0)

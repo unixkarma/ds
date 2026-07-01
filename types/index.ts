@@ -270,6 +270,10 @@ export interface StudentLedgerEntry {
   created_at: string
 }
 
+export interface StudentLedgerEntryWithStudent extends StudentLedgerEntry {
+  student: StudentWithUser
+}
+
 export interface PaymentWithRelations extends Payment {
   student: StudentWithUser
   package: Package | null

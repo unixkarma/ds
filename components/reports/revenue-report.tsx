@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { parseISO, startOfDay, endOfDay, format } from 'date-fns'
-import { DollarSign, CreditCard, TrendingUp, Package as PackageIcon, Wallet, Download } from 'lucide-react'
+import { DollarSign, CreditCard, TrendingUp, Package as PackageIcon, Wallet, Download, Receipt } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -14,12 +14,28 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { formatCurrency, formatDate, getFullName } from '@/lib/utils'
+import { cn, formatCurrency, formatDate, getFullName } from '@/lib/utils'
 import { toCSV, downloadCSV, type CSVColumn } from '@/lib/csv'
 import type {
   PaymentWithRelations,
   StudentPurchaseWithRelations,
+  StudentLedgerEntryWithStudent,
 } from '@/types'
+
+const LEDGER_TYPE_LABEL: Record<StudentLedgerEntryWithStudent['entry_type'], string> = {
+  charge: 'Charge',
+  payment: 'Payment',
+  adjustment: 'Adjustment',
+}
+
+const LEDGER_TYPE_BADGE: Record<
+  StudentLedgerEntryWithStudent['entry_type'],
+  'destructive' | 'default' | 'secondary'
+> = {
+  charge: 'destructive',
+  payment: 'default',
+  adjustment: 'secondary',
+}
 
 const PAYMENT_METHOD_LABEL: Record<string, string> = {
   card: 'Card',
@@ -78,9 +94,11 @@ function soldByLabel(p: StudentPurchaseWithRelations): string {
 interface RevenueReportProps {
   payments: PaymentWithRelations[]
   purchases: StudentPurchaseWithRelations[]
+  ledger: StudentLedgerEntryWithStudent[]
+  balances: Record<string, number>
 }
 
-export function RevenueReport({ payments, purchases }: RevenueReportProps) {
+export function RevenueReport({ payments, purchases, ledger, balances }: RevenueReportProps) {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
 
@@ -121,12 +139,42 @@ export function RevenueReport({ payments, purchases }: RevenueReportProps) {
     [purchases, startDate, endDate]
   )
 
+  // Running balance after each ledger entry, computed over the FULL history per
+  // student (unfiltered) so the "Balance" column stays meaningful even when a
+  // date filter hides earlier rows. `ledger` arrives oldest-first.
+  const balanceAfter = useMemo(() => {
+    const running = new Map<string, number>()   // studentId → cumulative balance
+    const result = new Map<string, number>()    // entryId   → balance after entry
+    for (const e of ledger) {
+      const next = (running.get(e.student_id) ?? 0) + e.amount_cents
+      running.set(e.student_id, next)
+      result.set(e.id, next)
+    }
+    return result
+  }, [ledger])
+
+  // Transactions to display: filtered by date, newest first.
+  const filteredLedger = useMemo(
+    () =>
+      ledger
+        .filter((e) => inRange(e.created_at))
+        .sort((a, b) => parseISO(b.created_at).getTime() - parseISO(a.created_at).getTime()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [ledger, startDate, endDate]
+  )
+
   const completedPayments = filteredPayments.filter((p) => p.status === 'completed')
   const totalCents = completedPayments.reduce((sum, p) => sum + p.amount_cents, 0)
   const avgCents = completedPayments.length > 0
     ? Math.round(totalCents / completedPayments.length)
     : 0
-  const pendingBalanceCents = filteredPurchases.reduce((sum, p) => sum + balanceCents(p), 0)
+  // Authoritative outstanding balance = sum of positive per-student ledger
+  // balances. Unlike the old purchases-only figure, this includes manual
+  // charges/credits/adjustments. Point-in-time (current), not date-filtered.
+  const outstandingBalanceCents = Object.values(balances).reduce(
+    (sum, b) => sum + Math.max(0, b),
+    0
+  )
 
   const byPackage = useMemo(() => {
     const map = new Map<string, { name: string; count: number; totalCents: number }>()
@@ -178,6 +226,25 @@ export function RevenueReport({ payments, purchases }: RevenueReportProps) {
     const csv = toCSV(filteredPurchases, columns)
     const today = format(new Date(), 'yyyy-MM-dd')
     downloadCSV(`revenue-${today}.csv`, csv)
+  }
+
+  const handleExportTransactions = () => {
+    const columns: CSVColumn<StudentLedgerEntryWithStudent>[] = [
+      { header: 'Date', value: (e) => format(parseISO(e.created_at), 'yyyy-MM-dd') },
+      { header: 'Student', value: (e) => getFullName(e.student.user) },
+      { header: 'Email', value: (e) => e.student.user.email ?? '' },
+      { header: 'Type', value: (e) => LEDGER_TYPE_LABEL[e.entry_type] },
+      { header: 'Concept', value: (e) => e.description ?? '' },
+      { header: 'Method', value: (e) => (e.payment_method ? methodLabel(e.payment_method) : '') },
+      { header: 'Amount', value: (e) => (e.amount_cents / 100).toFixed(2) },
+      {
+        header: 'Balance After',
+        value: (e) => ((balanceAfter.get(e.id) ?? 0) / 100).toFixed(2),
+      },
+    ]
+    const csv = toCSV(filteredLedger, columns)
+    const today = format(new Date(), 'yyyy-MM-dd')
+    downloadCSV(`transactions-${today}.csv`, csv)
   }
 
   return (
@@ -252,12 +319,12 @@ export function RevenueReport({ payments, purchases }: RevenueReportProps) {
         </Card>
         <Card>
           <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Pending Balance</CardTitle>
+            <CardTitle className="text-sm font-medium text-muted-foreground">Outstanding Balance</CardTitle>
             <Wallet className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{formatCurrency(pendingBalanceCents)}</p>
-            <p className="text-xs text-muted-foreground mt-1">Owed across sales in range</p>
+            <p className="text-2xl font-bold">{formatCurrency(outstandingBalanceCents)}</p>
+            <p className="text-xs text-muted-foreground mt-1">Owed now across all students</p>
           </CardContent>
         </Card>
       </div>
@@ -403,6 +470,92 @@ export function RevenueReport({ payments, purchases }: RevenueReportProps) {
           </Table>
         </div>
       )}
+
+      {/* Transactions — one row per ledger entry (charge / payment / adjustment).
+          The authoritative money-balance journal: includes manual charges and
+          credits that never appear as a package sale. */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Receipt className="h-4 w-4 text-muted-foreground" />
+            <h3 className="text-sm font-medium">Transactions</h3>
+            <span className="text-xs text-muted-foreground">
+              Every charge, payment and adjustment per student
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportTransactions}
+            disabled={filteredLedger.length === 0}
+            className="gap-2"
+          >
+            <Download className="h-4 w-4" />
+            Export CSV
+          </Button>
+        </div>
+
+        {filteredLedger.length === 0 ? (
+          <div className="flex items-center justify-center py-16 border rounded-lg">
+            <p className="text-sm text-muted-foreground">No transactions match the selected filters.</p>
+          </div>
+        ) : (
+          <div className="border rounded-lg overflow-hidden">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Student</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Concept</TableHead>
+                  <TableHead>Method</TableHead>
+                  <TableHead className="text-right">Amount</TableHead>
+                  <TableHead className="text-right">Balance</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredLedger.map((entry) => {
+                  const isCharge = entry.amount_cents > 0
+                  const runningBalance = balanceAfter.get(entry.id) ?? 0
+                  return (
+                    <TableRow key={entry.id}>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {formatDate(entry.created_at)}
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        {getFullName(entry.student.user)}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={LEDGER_TYPE_BADGE[entry.entry_type]}>
+                          {LEDGER_TYPE_LABEL[entry.entry_type]}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground max-w-[16rem] truncate">
+                        {entry.description || '—'}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {entry.payment_method ? methodLabel(entry.payment_method) : '—'}
+                      </TableCell>
+                      <TableCell
+                        className={cn(
+                          'text-right font-medium tabular-nums',
+                          isCharge ? 'text-amber-600' : 'text-emerald-600'
+                        )}
+                      >
+                        {isCharge ? '+' : '−'}
+                        {formatCurrency(Math.abs(entry.amount_cents))}
+                      </TableCell>
+                      <TableCell className="text-right font-medium tabular-nums">
+                        {formatCurrency(runningBalance)}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </div>
     </div>
   )
 }

@@ -122,6 +122,39 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // ── Tenant ownership ────────────────────────────────────────
+  // studentId / instructorId arrive in the request body. The INSERT and the
+  // lessons_remaining decrement below use the admin client (bypasses RLS), so
+  // we must explicitly verify both belong to the caller's school — never trust
+  // body-supplied IDs. (The user-scoped client + explicit school_id = belt and
+  // suspenders.)
+  const { data: studentOwner } = await supabase
+    .from('students')
+    .select('id')
+    .eq('id', studentId)
+    .eq('school_id', schoolId)
+    .single()
+  if (!studentOwner) {
+    return NextResponse.json({ error: 'Student not found' }, { status: 404 })
+  }
+
+  const { data: instructorOwner } = await supabase
+    .from('instructors')
+    .select('id, user_id')
+    .eq('id', instructorId)
+    .eq('school_id', schoolId)
+    .single()
+  if (!instructorOwner) {
+    return NextResponse.json({ error: 'Instructor not found' }, { status: 404 })
+  }
+  // Instructors may only book lessons against their own instructor record.
+  if (profile.role === 'instructor' && instructorOwner.user_id !== user.id) {
+    return NextResponse.json(
+      { error: 'You can only book lessons for yourself.' },
+      { status: 403 }
+    )
+  }
+
   // Determine sold_by: instructors creating lessons = 'instructor', otherwise 'school'
   const resolvedSoldBy = soldBy ?? (profile.role === 'instructor' ? 'instructor' : 'school')
 

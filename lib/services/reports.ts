@@ -3,7 +3,7 @@
 // Client-side filtering is applied after load.
 
 import { createClient } from '@/lib/supabase/server'
-import { getBalancesForStudents } from '@/lib/services/student-ledger'
+import { getBalancesForStudents, getLedgerForSchool } from '@/lib/services/student-ledger'
 import {
   listAssignmentsForSchool,
   listDeductionsForSchool,
@@ -16,6 +16,7 @@ import type {
   InstructorWithUser,
   ClassroomSessionWithRelations,
   StudentPurchaseWithRelations,
+  StudentLedgerEntryWithStudent,
   InstructorAssignmentWithInstructor,
   InstructorDeductionWithInstructor,
   InstructorReimbursementWithInstructor,
@@ -28,6 +29,7 @@ export interface ReportsData {
   students: StudentWithUser[]
   instructors: InstructorWithUser[]
   studentBalances: Record<string, number>
+  ledger: StudentLedgerEntryWithStudent[]
   classroomSessions: ClassroomSessionWithRelations[]
   assignments: InstructorAssignmentWithInstructor[]
   deductions: InstructorDeductionWithInstructor[]
@@ -96,8 +98,9 @@ export async function getReportsData(): Promise<ReportsData> {
   if (classroomErr) throw new Error(classroomErr.message)
 
   const studentList = (students ?? []) as unknown as StudentWithUser[]
-  const [balances, assignments, deductions, reimbursements] = await Promise.all([
+  const [balances, ledger, assignments, deductions, reimbursements] = await Promise.all([
     getBalancesForStudents(studentList.map((s) => s.id)),
+    getLedgerForSchool(),
     listAssignmentsForSchool(),
     listDeductionsForSchool(),
     listReimbursementsForSchool(),
@@ -110,6 +113,7 @@ export async function getReportsData(): Promise<ReportsData> {
     students: studentList,
     instructors: (instructors ?? []) as unknown as InstructorWithUser[],
     studentBalances: Object.fromEntries(balances),
+    ledger,
     classroomSessions: (classroomSessions ?? []) as unknown as ClassroomSessionWithRelations[],
     assignments,
     deductions,

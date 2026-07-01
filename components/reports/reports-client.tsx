@@ -36,7 +36,12 @@ export function ReportsClient({ data }: ReportsClientProps) {
       </TabsContent>
 
       <TabsContent value="revenue" className="mt-6">
-        <RevenueReport payments={data.payments} purchases={data.purchases} />
+        <RevenueReport
+          payments={data.payments}
+          purchases={data.purchases}
+          ledger={data.ledger}
+          balances={data.studentBalances}
+        />
       </TabsContent>
 
       <TabsContent value="students" className="mt-6">
