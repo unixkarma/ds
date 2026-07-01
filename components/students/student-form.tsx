@@ -39,6 +39,7 @@ const studentFormSchema = z.object({
   phone: z.string().min(1, 'Phone is required'),
   dateOfBirth: z.string().min(1, 'Date of birth is required'),
   ageGroup: z.enum(['teen', 'adult']),
+  roadTestDate: z.string(),
   notes: z.string(),
   parent1Name: z.string(),
   parent1Phone: z.string(),
@@ -88,6 +89,7 @@ export function StudentForm({ student }: StudentFormProps) {
       phone: student?.user.phone ?? '',
       dateOfBirth: initialDob,
       ageGroup: initialAgeGroup,
+      roadTestDate: student?.road_test_date ?? '',
       notes: student?.notes ?? '',
       parent1Name: student?.parent1_name ?? '',
       parent1Phone: student?.parent1_phone ?? '',
@@ -166,6 +168,7 @@ export function StudentForm({ student }: StudentFormProps) {
             phone: values.phone || '',
             dateOfBirth: values.dateOfBirth || null,
             ageGroup: values.ageGroup,
+            roadTestDate: values.roadTestDate || null,
             notes: values.notes || null,
             parent1Name: values.parent1Name,
             parent1Phone: values.parent1Phone,
@@ -333,6 +336,26 @@ export function StudentForm({ student }: StudentFormProps) {
             </FormItem>
           )}
         />
+
+        {isEdit && (
+          <FormField
+            control={form.control}
+            name="roadTestDate"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Road Test Date</FormLabel>
+                <FormControl>
+                  <Input type="date" {...field} />
+                </FormControl>
+                <p className="text-xs text-muted-foreground">
+                  Date the student passed the SOS road test. Starts the 3-year
+                  instruction-record retention window (Illinois 625 ILCS 5/6-408).
+                </p>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        )}
 
         {/* Parent / Emergency Contact */}
         <div className="border rounded-md p-4 space-y-4 bg-muted/30">

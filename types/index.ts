@@ -94,6 +94,7 @@ export interface Student {
   parent2_phone: string
   parent2_email: string
   road_test_status: string
+  road_test_date: string | null
   wears_glasses_contacts: string
   medical_conditions: string
   how_heard_about_us: string

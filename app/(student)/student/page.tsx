@@ -102,7 +102,7 @@ export default async function StudentPortalPage() {
         </Card>
       ) : null}
 
-      {/* Classroom progress (only if student has classroom hours required) */}
+      {/* Classroom progress (only if student has classroom classes required) */}
       {classroomRequired > 0 && (
         <Card>
           <CardContent className="pt-5 pb-5 flex items-center gap-4">
@@ -110,7 +110,7 @@ export default async function StudentPortalPage() {
             <div className="flex-1">
               <p className="text-sm font-medium">Classroom Progress</p>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {classroomAttended} of {classroomRequired} hours attended
+                {classroomAttended} of {classroomRequired} classes attended
                 {classroomRemaining > 0 && ` · ${classroomRemaining} remaining`}
               </p>
             </div>

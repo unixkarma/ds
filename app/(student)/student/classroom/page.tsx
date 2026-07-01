@@ -55,7 +55,7 @@ export default async function StudentClassroomPage() {
               <div className="flex-1">
                 <p className="text-sm font-medium">Classroom Progress</p>
                 <p className="text-xs text-muted-foreground mt-0.5">
-                  {totalAttended} of {totalRequired} hours attended
+                  {totalAttended} of {totalRequired} classes attended
                   {remaining > 0 && ` · ${remaining} remaining`}
                 </p>
               </div>
