@@ -4,6 +4,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { encryptSecret } from '@/lib/crypto'
 
 const TIMEZONE_VALUES = [
   'America/New_York',
@@ -64,8 +65,13 @@ export async function PATCH(request: NextRequest) {
   if (d.address !== undefined) update.address = d.address
   if (d.timezone !== undefined) update.timezone = d.timezone
   if (d.stripe_publishable_key !== undefined) update.stripe_publishable_key = d.stripe_publishable_key
-  if (d.stripe_secret_key !== undefined) update.stripe_secret_key = d.stripe_secret_key
-  if (d.stripe_webhook_secret !== undefined) update.stripe_webhook_secret = d.stripe_webhook_secret
+  // Secrets are encrypted at rest (AES-256-GCM). The form only sends these when
+  // the admin types a NEW value (it masks existing keys with ••••), so we never
+  // double-encrypt. A null clears the key.
+  if (d.stripe_secret_key !== undefined)
+    update.stripe_secret_key = d.stripe_secret_key ? encryptSecret(d.stripe_secret_key) : null
+  if (d.stripe_webhook_secret !== undefined)
+    update.stripe_webhook_secret = d.stripe_webhook_secret ? encryptSecret(d.stripe_webhook_secret) : null
   if (d.single_lesson_price_cents !== undefined) update.single_lesson_price_cents = d.single_lesson_price_cents
   if (d.student_cancellation_fee_cents !== undefined) update.student_cancellation_fee_cents = d.student_cancellation_fee_cents
   if (d.instructor_cancellation_fee_cents !== undefined) update.instructor_cancellation_fee_cents = d.instructor_cancellation_fee_cents

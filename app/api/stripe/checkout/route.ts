@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { applyCardSurcharge, createStripeClient } from '@/lib/stripe'
+import { decryptSecret } from '@/lib/crypto'
 
 const bodySchema = z.object({
   // Either a package_id OR 'single_lesson'
@@ -106,7 +107,7 @@ export async function POST(request: NextRequest) {
   // is recorded at list price; the surcharge is implicit in the gross.
   const { surchargeCents, totalCents } = applyCardSurcharge(amountCents)
 
-  const stripe = createStripeClient(school.stripe_secret_key)
+  const stripe = createStripeClient(decryptSecret(school.stripe_secret_key)!)
 
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',

@@ -9,13 +9,8 @@ import { NextResponse, type NextRequest } from 'next/server'
 import type Stripe from 'stripe'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { createStripeClient } from '@/lib/stripe'
-import { creditLessonsForPayment } from '@/lib/services/payments'
-import {
-  applyPaymentToPurchases,
-  bumpStudentLessons,
-  createPurchase,
-} from '@/lib/services/student-purchases'
-import { insertLedgerEntry } from '@/lib/services/student-ledger'
+import { serverError } from '@/lib/api-error'
+import { decryptSecret } from '@/lib/crypto'
 import { notifyPackagePurchase } from '@/lib/email/send-package-confirmation'
 
 export async function POST(request: NextRequest) {
@@ -57,17 +52,19 @@ export async function POST(request: NextRequest) {
     .eq('id', schoolId)
     .single()
 
-  if (!school?.stripe_secret_key || !school?.stripe_webhook_secret) {
+  const secretKey = decryptSecret(school?.stripe_secret_key)
+  const webhookSecret = decryptSecret(school?.stripe_webhook_secret)
+  if (!secretKey || !webhookSecret) {
     return NextResponse.json({ error: 'School Stripe not configured' }, { status: 422 })
   }
 
   // Verify the webhook signature
-  const stripe = createStripeClient(school.stripe_secret_key)
+  const stripe = createStripeClient(secretKey)
   let event
   try {
-    event = stripe.webhooks.constructEvent(payload, sig, school.stripe_webhook_secret)
+    event = stripe.webhooks.constructEvent(payload, sig, webhookSecret)
   } catch (err) {
-    return NextResponse.json({ error: `Webhook signature verification failed: ${err}` }, { status: 400 })
+    return serverError('stripe/webhook: signature verification failed', err, 400)
   }
 
   // Handle the event
@@ -122,57 +119,37 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Balance payment: pay down outstanding purchases ─────────────
+    // Atomic + idempotent: the RPC records the payment (keyed on the UNIQUE
+    // stripe_payment_intent_id), applies it to purchases, writes the ledger
+    // entry and bumps lessons — all in one transaction. A Stripe retry returns
+    // { duplicate: true } and nothing is applied twice.
     if (mode === 'balance') {
-      // Idempotency: the payment row is inserted first with the Stripe
-      // payment_intent_id (UNIQUE). On a Stripe retry the insert returns
-      // 23505 — we skip the rest so nothing double-applies.
-      const apply = await applyPaymentToPurchases(adminClient, studentId, amountCents)
-      const saleDate = apply.oldestSaleDate ?? new Date().toISOString()
-
-      const { data: payment, error: paymentError } = await adminClient
-        .from('payments')
-        .insert({
-          school_id: schoolId,
-          student_id: studentId,
-          package_id: null,
-          stripe_payment_intent_id: completedSession.payment_intent,
-          amount_cents: grossAmountCents,
-          status: 'completed',
-          payment_method: paymentMethodType,
-          card_brand: cardBrand,
-          card_last4: cardLast4,
-          receipt_url: receiptUrl,
-          description: 'Balance payment (card)',
-          sale_date: saleDate,
-          sold_by: 'online',
-        })
-        .select('id')
-        .single()
-
-      // 23505 = unique_violation → Stripe retry, already processed.
-      if (paymentError) {
-        const code = (paymentError as { code?: string }).code
-        if (code === '23505') {
-          return NextResponse.json({ received: true, duplicate: true })
+      const { data: result, error: rpcError } = await adminClient.rpc(
+        'record_balance_payment',
+        {
+          p_school_id: schoolId,
+          p_student_id: studentId,
+          p_amount_cents: amountCents,
+          p_payment_amount_cents: grossAmountCents,
+          p_payment_method: paymentMethodType,
+          p_ledger_payment_method: 'stripe',
+          p_card_brand: cardBrand,
+          p_card_last4: cardLast4,
+          p_stripe_payment_intent_id: completedSession.payment_intent,
+          p_receipt_url: receiptUrl,
+          p_description: 'Balance payment (card)',
+          p_sold_by: 'online',
+          p_recorded_by: null,
+          p_sold_by_instructor_id: null,
         }
-        return NextResponse.json({ error: paymentError.message }, { status: 500 })
+      )
+
+      if (rpcError) {
+        return serverError('stripe/webhook: record_balance_payment', rpcError)
       }
-
-      await insertLedgerEntry({
-        client: adminClient,
-        schoolId,
-        studentId,
-        amountCents: -amountCents,
-        entryType: 'payment',
-        description: 'Balance payment (card)',
-        paymentMethod: 'stripe',
-        paymentId: payment!.id,
-      })
-
-      if (apply.lessonsUnlocked > 0) {
-        await bumpStudentLessons(adminClient, studentId, apply.lessonsUnlocked)
+      if (result?.duplicate) {
+        return NextResponse.json({ received: true, duplicate: true })
       }
-
       return NextResponse.json({ received: true })
     }
 
@@ -200,36 +177,42 @@ export async function POST(request: NextRequest) {
       requirements = pkg?.requirements ?? null
     }
 
-    await createPurchase({
-      client: adminClient,
-      schoolId,
-      studentId,
-      packageId,
-      packageName,
-      totalLessons: lessonCount,
-      priceCents: amountCents,
-      amountPaidCents: amountCents,
-      classroomRequired,
-      requirements,
-      soldBy: 'online',
-    })
+    // Atomic + idempotent: the RPC records the payment (GROSS = base + card
+    // surcharge, keyed on the UNIQUE stripe_payment_intent_id), creates the
+    // purchase and credits lessons in one transaction. Stripe Checkout is
+    // always paid in full, so all lessons activate. A retry returns duplicate.
+    const { data: result, error: rpcError } = await adminClient.rpc(
+      'record_package_purchase',
+      {
+        p_school_id: schoolId,
+        p_student_id: studentId,
+        p_package_id: packageId,
+        p_package_name: packageName,
+        p_total_lessons: lessonCount,
+        p_price_cents: amountCents,
+        p_discount_cents: 0,
+        p_purchase_paid_cents: amountCents,
+        p_payment_amount_cents: grossAmountCents,
+        p_classroom_required: classroomRequired,
+        p_requirements: requirements,
+        p_payment_method: paymentMethodType,
+        p_card_brand: cardBrand,
+        p_card_last4: cardLast4,
+        p_stripe_payment_intent_id: completedSession.payment_intent ?? null,
+        p_receipt_url: receiptUrl,
+        p_description: null,
+        p_sold_by: 'online',
+        p_recorded_by: null,
+        p_sold_by_instructor_id: null,
+      }
+    )
 
-    await creditLessonsForPayment({
-      adminClient,
-      schoolId,
-      studentId,
-      packageId,
-      lessonCount,
-      // Record the GROSS (base + card surcharge) so revenue reports match
-      // what Stripe actually deposited.
-      amountCents: grossAmountCents,
-      paymentMethod: paymentMethodType,
-      cardBrand,
-      cardLast4,
-      stripePaymentIntentId: completedSession.payment_intent ?? null,
-      receiptUrl,
-      soldBy: 'online',
-    })
+    if (rpcError) {
+      return serverError('stripe/webhook: record_package_purchase', rpcError)
+    }
+    if (result?.duplicate) {
+      return NextResponse.json({ received: true, duplicate: true })
+    }
 
     // Fire-and-forget confirmation email. Paid in full → all lessons activated.
     void notifyPackagePurchase({

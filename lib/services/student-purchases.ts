@@ -57,6 +57,11 @@ export interface CreatePurchaseArgs {
 
 // Inserts a new purchase row and returns the number of lessons that should
 // be added to students.lessons_remaining / total_lessons_purchased.
+//
+// @deprecated NON-ATOMIC — do not use in payment flows. The webhook + manual
+// payment routes now use the atomic `record_package_purchase` /
+// `record_balance_payment` RPCs (migration 039). Using this again reintroduces
+// the partial-failure / lost-update billing bugs. Read-only callers only.
 export async function createPurchase(args: CreatePurchaseArgs): Promise<{
   id: string
   lessonsActivated: number
@@ -115,6 +120,9 @@ export interface ApplyPaymentResult {
   oldestSaleDate: string | null // created_at of the first purchase touched (for sale_date)
 }
 
+// @deprecated NON-ATOMIC — superseded by the `record_balance_payment` RPC
+// (migration 039). Do not use in payment flows; it has a concurrent
+// double-apply race the RPC fixes with FOR UPDATE.
 // Walk outstanding purchases for a student (oldest first) and apply the payment.
 // Each purchase grows amount_paid_cents and lessons_activated proportionally.
 // Returns:
@@ -174,9 +182,8 @@ export async function applyPaymentToPurchases(
   return { lessonsUnlocked, appliedCents: appliedTotal, oldestSaleDate }
 }
 
-// Helper used by the package-assignment flow to bump student counters
-// without going through creditLessonsForPayment (which also inserts a
-// payments row — we may not want one for an unpaid sale).
+// @deprecated NON-ATOMIC read-modify-write on lessons_remaining — superseded by
+// the atomic UPDATEs inside the migration-039 RPCs. Do not use in payment flows.
 export async function bumpStudentLessons(
   client: SupabaseClient,
   studentId: string,

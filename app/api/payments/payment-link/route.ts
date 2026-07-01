@@ -20,6 +20,7 @@ import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { applyCardSurcharge, createStripeClient } from '@/lib/stripe'
+import { decryptSecret } from '@/lib/crypto'
 import { notifyPaymentLink } from '@/lib/email/send-payment-link'
 
 const bodySchema = z
@@ -133,7 +134,7 @@ export async function POST(request: NextRequest) {
   // 3% card processing fee as a separate Stripe line item.
   const { surchargeCents, totalCents } = applyCardSurcharge(baseAmountCents)
 
-  const stripe = createStripeClient(school.stripe_secret_key)
+  const stripe = createStripeClient(decryptSecret(school.stripe_secret_key)!)
 
   const session = await stripe.checkout.sessions.create({
     mode: 'payment',

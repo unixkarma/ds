@@ -38,8 +38,10 @@ export interface CreditLessonsArgs {
 }
 
 // Records a completed payment and credits the student's lesson balance.
-// Shared by the Stripe webhook (paymentMethod='card') and the admin manual
-// payment route (paymentMethod='cash' | 'check' | 'other').
+//
+// @deprecated NON-ATOMIC (separate payment insert + read-modify-write on
+// lessons_remaining) — superseded by the atomic `record_package_purchase` /
+// `record_custom_payment` RPCs (migration 039). Do not reuse in payment flows.
 export async function creditLessonsForPayment(
   args: CreditLessonsArgs
 ): Promise<{ paymentId: string }> {

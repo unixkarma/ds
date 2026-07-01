@@ -16,13 +16,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { creditLessonsForPayment } from '@/lib/services/payments'
-import { insertLedgerEntry } from '@/lib/services/student-ledger'
-import {
-  applyPaymentToPurchases,
-  bumpStudentLessons,
-  createPurchase,
-} from '@/lib/services/student-purchases'
+import { serverError } from '@/lib/api-error'
 import { notifyPackagePurchase } from '@/lib/email/send-package-confirmation'
 
 const bodySchema = z
@@ -130,12 +124,6 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const attribution = {
-    soldBy,
-    recordedBy: user.id,
-    soldByInstructorId,
-  }
-
   try {
     // ── Mode: package ─────────────────────────────────────
     if (mode === 'package') {
@@ -157,58 +145,43 @@ export async function POST(request: NextRequest) {
         paymentStatus === 'paid_full' ? effectivePrice
         : paymentStatus === 'partial' ? Math.min(parsed.data.amountPaidCents!, effectivePrice)
         : 0
-      const owed = effectivePrice - paid
 
-      // 1. Create the purchase. Returns the proportional lessons to activate.
-      const { id: purchaseId, lessonsActivated } = await createPurchase({
-        client: adminClient,
-        schoolId: profile.school_id,
-        studentId,
-        packageId: pkg.id,
-        packageName: pkg.name,
-        totalLessons: pkg.lesson_count,
-        priceCents: price,
-        discountCents: discount,
-        amountPaidCents: paid,
-        classroomRequired: pkg.classroom_required ?? 0,
-        requirements: pkg.requirements ?? null,
-        ...attribution,
-      })
+      // Atomic: purchase + payment (if any) + lesson bump + unpaid-portion
+      // ledger charge, all in one transaction. Lessons activate proportionally.
+      const { data: result, error: rpcError } = await adminClient.rpc(
+        'record_package_purchase',
+        {
+          p_school_id: profile.school_id,
+          p_student_id: studentId,
+          p_package_id: pkg.id,
+          p_package_name: pkg.name,
+          p_total_lessons: pkg.lesson_count,
+          p_price_cents: price,
+          p_discount_cents: discount,
+          p_purchase_paid_cents: paid,
+          p_payment_amount_cents: paid,
+          p_classroom_required: pkg.classroom_required ?? 0,
+          p_requirements: pkg.requirements ?? null,
+          p_payment_method: paymentMethod,
+          p_card_brand: null,
+          p_card_last4: null,
+          p_stripe_payment_intent_id: null,
+          p_receipt_url: null,
+          p_description: description ?? null,
+          p_sold_by: soldBy,
+          p_recorded_by: user.id,
+          p_sold_by_instructor_id: soldByInstructorId,
+        }
+      )
 
-      // 2. Record the payment + bump lessons (only the activated portion)
-      let paymentId: string | null = null
-      if (paid > 0) {
-        const result = await creditLessonsForPayment({
-          adminClient,
-          schoolId: profile.school_id,
-          studentId,
-          packageId: pkg.id,
-          lessonCount: lessonsActivated,
-          amountCents: paid,
-          paymentMethod,
-          description: description ?? null,
-          discountCents: discount,
-          ...attribution,
-        })
-        paymentId = result.paymentId
-      }
-      // For paid == 0 (unpaid): no payment row, lessonsActivated is 0 by definition.
-
-      // 3. Insert ledger charge for the unpaid portion (if any)
-      if (owed > 0) {
-        await insertLedgerEntry({
-          client: adminClient,
-          schoolId: profile.school_id,
-          studentId,
-          amountCents: owed,
-          entryType: 'charge',
-          description: description?.trim() || `Pending balance — ${pkg.name}`,
-          packageId: pkg.id,
-          createdBy: user.id,
-        })
+      if (rpcError || !result) {
+        return serverError('payments/manual: record_package_purchase', rpcError)
       }
 
-      // 4. Fire-and-forget confirmation email (never blocks the response)
+      const lessonsActivated: number = result.lessons_activated ?? 0
+      const owed: number = result.owed ?? 0
+
+      // Fire-and-forget confirmation email (never blocks the response)
       void notifyPackagePurchase({
         client: adminClient,
         schoolId: profile.school_id,
@@ -225,7 +198,12 @@ export async function POST(request: NextRequest) {
       })
 
       return NextResponse.json(
-        { paymentId, purchaseId, lessonsActivated, balanceCharge: owed },
+        {
+          paymentId: result.payment_id ?? null,
+          purchaseId: result.purchase_id,
+          lessonsActivated,
+          balanceCharge: owed,
+        },
         { status: 201 }
       )
     }
@@ -235,75 +213,63 @@ export async function POST(request: NextRequest) {
       const lessonCount = parsed.data.lessonCount!
       const amountCents = parsed.data.amountPaidCents!
 
-      const result = await creditLessonsForPayment({
-        adminClient,
-        schoolId: profile.school_id,
-        studentId,
-        packageId: null,
-        lessonCount,
-        amountCents,
-        paymentMethod,
-        description: description ?? null,
-        ...attribution,
-      })
+      const { data: result, error: rpcError } = await adminClient.rpc(
+        'record_custom_payment',
+        {
+          p_school_id: profile.school_id,
+          p_student_id: studentId,
+          p_lesson_count: lessonCount,
+          p_amount_cents: amountCents,
+          p_payment_method: paymentMethod,
+          p_description: description ?? null,
+          p_sold_by: soldBy,
+          p_recorded_by: user.id,
+          p_sold_by_instructor_id: soldByInstructorId,
+        }
+      )
 
-      return NextResponse.json({ paymentId: result.paymentId }, { status: 201 })
+      if (rpcError || !result) {
+        return serverError('payments/manual: record_custom_payment', rpcError)
+      }
+
+      return NextResponse.json({ paymentId: result.payment_id }, { status: 201 })
     }
 
     // ── Mode: balance ─────────────────────────────────────
-    // Pay down outstanding balance. Applies to outstanding purchases (oldest
-    // first), unlocking lessons proportionally. Records a payment row + a
-    // negative ledger entry. sale_date = the oldest touched purchase, or now.
+    // Pay down outstanding balance. Atomic: applies to outstanding purchases
+    // (oldest first, row-locked), records the payment + negative ledger entry
+    // and bumps lessons in one transaction. sale_date = oldest touched purchase.
     const amount = parsed.data.amountPaidCents!
 
-    const apply = await applyPaymentToPurchases(adminClient, studentId, amount)
-    const saleDate = apply.oldestSaleDate ?? new Date().toISOString()
+    const { data: result, error: rpcError } = await adminClient.rpc(
+      'record_balance_payment',
+      {
+        p_school_id: profile.school_id,
+        p_student_id: studentId,
+        p_amount_cents: amount,
+        p_payment_amount_cents: amount,
+        p_payment_method: paymentMethod,
+        p_ledger_payment_method: paymentMethod,
+        p_card_brand: null,
+        p_card_last4: null,
+        p_stripe_payment_intent_id: null,
+        p_receipt_url: null,
+        p_description: description ?? null,
+        p_sold_by: soldBy,
+        p_recorded_by: user.id,
+        p_sold_by_instructor_id: soldByInstructorId,
+      }
+    )
 
-    const { data: payment, error: paymentError } = await adminClient
-      .from('payments')
-      .insert({
-        school_id: profile.school_id,
-        student_id: studentId,
-        package_id: null,
-        stripe_payment_intent_id: null,
-        amount_cents: amount,
-        status: 'completed',
-        payment_method: paymentMethod,
-        description: description ?? null,
-        sale_date: saleDate,
-        sold_by: soldBy,
-        recorded_by: user.id,
-        sold_by_instructor_id: soldByInstructorId,
-      })
-      .select('id')
-      .single()
-
-    if (paymentError || !payment) {
-      throw new Error(paymentError?.message ?? 'Failed to record payment')
-    }
-
-    await insertLedgerEntry({
-      client: adminClient,
-      schoolId: profile.school_id,
-      studentId,
-      amountCents: -amount,
-      entryType: 'payment',
-      description: description?.trim() || 'Balance payment',
-      paymentMethod,
-      paymentId: payment.id,
-      createdBy: user.id,
-    })
-
-    if (apply.lessonsUnlocked > 0) {
-      await bumpStudentLessons(adminClient, studentId, apply.lessonsUnlocked)
+    if (rpcError || !result) {
+      return serverError('payments/manual: record_balance_payment', rpcError)
     }
 
     return NextResponse.json(
-      { paymentId: payment.id, lessonsUnlocked: apply.lessonsUnlocked },
+      { paymentId: result.payment_id, lessonsUnlocked: result.lessons_unlocked ?? 0 },
       { status: 201 }
     )
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to record payment'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return serverError('payments/manual', err)
   }
 }
