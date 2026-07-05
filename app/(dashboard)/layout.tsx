@@ -6,6 +6,8 @@ import { Sidebar } from '@/components/dashboard/sidebar'
 import { Header } from '@/components/dashboard/header'
 import { getPendingApplicationsCount } from '@/lib/services/applications'
 import { getPendingDaysOffCount } from '@/lib/services/days-off'
+import { getSchoolSubscription, subscriptionHasAccess } from '@/lib/services/billing'
+import { BillingNotice } from '@/components/billing/billing-notice'
 
 // Protect all /dashboard/* routes — server-side auth check
 export default async function DashboardLayout({ children }: { children: ReactNode }) {
@@ -33,6 +35,13 @@ export default async function DashboardLayout({ children }: { children: ReactNod
   const pendingApplications = await getPendingApplicationsCount()
   const pendingDaysOff = await getPendingDaysOffCount()
 
+  // Platform-billing gate. Enforcement is opt-in via BILLING_ENFORCED so it
+  // never locks schools out before the Lemon Squeezy account is live.
+  const billingEnforced = process.env.BILLING_ENFORCED === 'true'
+  const hasSubscription = subscriptionHasAccess(await getSchoolSubscription())
+  const showGate = billingEnforced && !hasSubscription
+  const showBanner = !billingEnforced && !hasSubscription
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Desktop sidebar — hidden on mobile */}
@@ -54,8 +63,9 @@ export default async function DashboardLayout({ children }: { children: ReactNod
         />
 
         {/* Page content */}
+        {showBanner && <BillingNotice mode="banner" />}
         <main className="flex-1 overflow-y-auto p-4 md:p-6">
-          {children}
+          {showGate ? <BillingNotice mode="gate" /> : children}
         </main>
       </div>
     </div>

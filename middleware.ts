@@ -13,7 +13,8 @@ export const config = {
      * - _next/image (image optimization)
      * - favicon.ico, sitemap.xml, robots.txt
      * - /api/stripe/webhook (Stripe webhook must not require auth)
+     * - /api/billing/webhook (Lemon Squeezy webhook must not require auth)
      */
-    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|api/stripe/webhook|api/register/student|api/instructor-applications|apply).*)',
+    '/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|api/stripe/webhook|api/billing/webhook|api/register/student|api/instructor-applications|apply).*)',
   ],
 }

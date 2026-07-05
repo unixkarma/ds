@@ -15,6 +15,7 @@ import {
   ClipboardList,
   GraduationCap,
   CalendarOff,
+  Receipt,
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
@@ -32,6 +33,7 @@ const navItems = [
   { href: '/dashboard/packages', label: 'Packages', icon: Package },
   { href: '/dashboard/payments', label: 'Payments', icon: CreditCard },
   { href: '/dashboard/reports', label: 'Reports', icon: BarChart3 },
+  { href: '/dashboard/billing', label: 'Billing', icon: Receipt },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
 ]
 
