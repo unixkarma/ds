@@ -5,6 +5,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getPermitPhotoSignedUrl } from '@/lib/storage/permit-photo'
 
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 const MAX_SIZE = 5 * 1024 * 1024 // 5 MB
@@ -60,16 +61,22 @@ export async function POST(
     return NextResponse.json({ error: 'File too large. Maximum size is 5 MB.' }, { status: 400 })
   }
 
-  // Get the student's user_id for the storage path
+  // Get the student's user_id (for the storage path) and school_id (for the
+  // cross-tenant check below).
   const adminClient = createAdminClient()
   const { data: student } = await adminClient
     .from('students')
-    .select('user_id')
+    .select('user_id, school_id')
     .eq('id', studentId)
     .single()
 
   if (!student) {
     return NextResponse.json({ error: 'Student not found' }, { status: 404 })
+  }
+
+  // An admin may only touch students in their own school.
+  if (profile.role === 'admin' && student.school_id !== profile.school_id) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 
   const ext = file.name.split('.').pop() || 'jpg'
@@ -88,18 +95,14 @@ export async function POST(
     return NextResponse.json({ error: uploadError.message }, { status: 500 })
   }
 
-  // Get public URL
-  const { data: urlData } = adminClient.storage
-    .from('permit-photos')
-    .getPublicUrl(storagePath)
-
-  const publicUrl = urlData.publicUrl
-
-  // Update student record
+  // Store the bare storage path. The bucket is private; the image is served via
+  // short-lived signed URLs, never a public URL.
   await adminClient
     .from('students')
-    .update({ permit_photo_url: publicUrl })
+    .update({ permit_photo_url: storagePath })
     .eq('id', studentId)
 
-  return NextResponse.json({ url: publicUrl })
+  // Return a signed URL so the client can render the freshly uploaded photo.
+  const signedUrl = await getPermitPhotoSignedUrl(storagePath)
+  return NextResponse.json({ url: signedUrl })
 }

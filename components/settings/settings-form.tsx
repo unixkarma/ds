@@ -185,8 +185,8 @@ function StripeForm({ school }: { school: School }) {
     resolver: zodResolver(stripeSchema),
     defaultValues: {
       stripe_publishable_key: school.stripe_publishable_key ?? '',
-      stripe_secret_key: school.stripe_secret_key ? '••••••••••••••••' : '',
-      stripe_webhook_secret: school.stripe_webhook_secret ? '••••••••••••••••' : '',
+      stripe_secret_key: school.has_stripe_secret_key ? '••••••••••••••••' : '',
+      stripe_webhook_secret: school.has_stripe_webhook_secret ? '••••••••••••••••' : '',
       single_lesson_price_cents: school.single_lesson_price_cents
         ? String(school.single_lesson_price_cents)
         : '0',
@@ -225,7 +225,7 @@ function StripeForm({ school }: { school: School }) {
     setTimeout(() => setSuccess(false), 3000)
   }
 
-  const isConnected = !!(school.stripe_publishable_key && school.stripe_secret_key)
+  const isConnected = !!(school.stripe_publishable_key && school.has_stripe_secret_key)
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">

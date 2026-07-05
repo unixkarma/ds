@@ -35,6 +35,10 @@ export interface School {
   stripe_publishable_key: string | null
   stripe_secret_key: string | null
   stripe_webhook_secret: string | null
+  // The secret values above are never sent to the browser (see getSchoolSettings);
+  // these booleans tell the UI whether each secret is configured.
+  has_stripe_secret_key?: boolean
+  has_stripe_webhook_secret?: boolean
   single_lesson_price_cents: number
   student_cancellation_fee_cents: number
   instructor_cancellation_fee_cents: number

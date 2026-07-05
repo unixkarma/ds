@@ -4,6 +4,7 @@ import { AlertTriangle, CalendarDays, CheckCircle, Clock, BookOpen, Wallet, Grad
 import Link from 'next/link'
 
 import { getStudentPortalData } from '@/lib/services/student-portal'
+import { getPermitPhotoSignedUrl } from '@/lib/storage/permit-photo'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { PermitUpload } from '@/components/student/permit-upload'
@@ -25,6 +26,7 @@ export default async function StudentPortalPage() {
   if (!data) redirect('/login')
 
   const { student, upcomingLessons, recentLessons, balanceCents, ledger, purchases, classroomRequired } = data
+  const permitPhotoUrl = await getPermitPhotoSignedUrl(student.permit_photo_url)
   const lessonsRemaining = student.lessons_remaining ?? 0
   const classroomAttended = student.classroom_sessions_attended ?? 0
   const classroomRemaining = Math.max(classroomRequired - classroomAttended, 0)
@@ -127,7 +129,7 @@ export default async function StudentPortalPage() {
       {/* Permit photo upload */}
       <PermitUpload
         studentId={student.id}
-        existingUrl={student.permit_photo_url || ''}
+        existingUrl={permitPhotoUrl || ''}
       />
 
       {/* Upcoming lessons */}
