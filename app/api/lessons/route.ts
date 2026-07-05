@@ -144,12 +144,19 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Fetch instructor for pricing + buffer
+  // Fetch instructor for pricing + buffer. Must belong to the caller's school —
+  // otherwise an admin/instructor could book against a foreign-tenant instructor
+  // by passing its id (IDOR).
   const { data: instructorRecord } = await supabase
     .from('instructors')
     .select('modality, hourly_rate_cents, lesson_price_cents, commission_rate, buffer_minutes')
     .eq('id', instructorId)
+    .eq('school_id', schoolId)
     .single()
+
+  if (!instructorRecord) {
+    return NextResponse.json({ error: 'Instructor not found' }, { status: 404 })
+  }
 
   // Calculate price_cents for this lesson
   const hours = durationMinutes / 60
@@ -160,6 +167,19 @@ export async function POST(request: NextRequest) {
     } else if (school) {
       priceCents = Math.round(school.single_lesson_price_cents * hours)
     }
+  }
+
+  // The target student must belong to the caller's school. Guards admin/
+  // instructor callers passing a studentId from another tenant (IDOR).
+  const { data: studentSchool } = await supabase
+    .from('students')
+    .select('id')
+    .eq('id', studentId)
+    .eq('school_id', schoolId)
+    .maybeSingle()
+
+  if (!studentSchool) {
+    return NextResponse.json({ error: 'Student not found' }, { status: 404 })
   }
 
   // Students can only book lessons for themselves

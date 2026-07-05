@@ -65,7 +65,26 @@ export async function PATCH(
 
   if (!existing) return NextResponse.json({ error: 'Lesson not found' }, { status: 404 })
 
+  // An instructor may only act on their OWN lessons, not a colleague's.
+  if (profile.role === 'instructor') {
+    const { data: me } = await supabase
+      .from('instructors')
+      .select('id')
+      .eq('user_id', user.id)
+      .single()
+
+    if (!me || me.id !== existing.instructor_id) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+  }
+
   const updates = parsed.data
+
+  // Only an admin may override who a cancellation/reschedule is attributed to
+  // (e.g. blame the student to trigger the late fee). An instructor passing
+  // cancelledBy is ignored, so they can't dodge their own deduction or charge
+  // the student.
+  const attributedBy = profile.role === 'admin' ? updates.cancelledBy : undefined
 
   // If rescheduling, run conflict detection for the new time
   if (updates.scheduledAt) {
@@ -220,8 +239,8 @@ export async function PATCH(
   if (updates.status === 'cancelled' && existing.status !== 'cancelled') {
     // Who cancelled: explicit override (admin can attribute to student) or role.
     let cancelledBy: string
-    if (updates.cancelledBy) {
-      cancelledBy = updates.cancelledBy
+    if (attributedBy) {
+      cancelledBy = attributedBy
     } else if (profile.role === 'instructor') {
       cancelledBy = 'instructor'
     } else if (profile.role === 'student') {
@@ -279,7 +298,7 @@ export async function PATCH(
     updates.scheduledAt &&
     !updates.status &&
     existing.status === 'scheduled' &&
-    updates.cancelledBy === 'student' &&
+    attributedBy === 'student' &&
     withinFeeWindow
   ) {
     const { data: school } = await adminClient
