@@ -83,6 +83,7 @@ export interface Student {
   total_lessons_completed: number
   lessons_remaining: number
   classroom_sessions_attended: number
+  observation_minutes_completed: number
   notes: string | null
   emergency_contact_name: string
   emergency_contact_phone: string
@@ -155,6 +156,9 @@ export interface Vehicle {
 // ── Lesson sale origin ───────────────────────────────────────
 export type LessonSoldBy = 'school' | 'instructor'
 export type LessonCancelledBy = 'student' | 'instructor' | 'admin'
+// drive = behind-the-wheel; observation = student rides along while
+// another student drives (IL requires 6 observation hours for teens)
+export type LessonType = 'drive' | 'observation'
 
 // ── Lessons ───────────────────────────────────────────────────
 export interface Lesson {
@@ -166,6 +170,8 @@ export interface Lesson {
   scheduled_at: string
   duration_minutes: number
   status: LessonStatus
+  lesson_type: LessonType
+  paired_lesson_id: string | null
   notes_covered: string
   notes_practice: string
   notes_additional: string

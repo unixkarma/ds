@@ -50,6 +50,7 @@ const createLessonSchema = z.object({
   scheduledAt: z.string().datetime().optional(),
   durationMinutes: z.number().int().min(15).max(240).default(60),
   openingId: z.string().uuid().optional(),
+  lessonType: z.enum(['drive', 'observation']).default('drive'),
   vehicleId: z.string().uuid().nullable().optional(),
   notesCovered: z.string().max(150).optional(),
   notesPractice: z.string().max(150).optional(),
@@ -83,8 +84,17 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { studentId, vehicleId, notesCovered, notesPractice, notesAdditional, pickupLocation, dropoffLocation, soldBy, openingId } = parsed.data
+  const { studentId, vehicleId, notesCovered, notesPractice, notesAdditional, pickupLocation, dropoffLocation, soldBy, openingId, lessonType } = parsed.data
   const schoolId = profile.school_id
+
+  // Observation lessons are scheduled by staff (they ride along with an
+  // existing drive lesson) — students book only regular drive lessons.
+  if (profile.role === 'student' && lessonType !== 'drive') {
+    return NextResponse.json(
+      { error: 'Only drive lessons can be booked from the student portal.' },
+      { status: 403 }
+    )
+  }
 
   // ── Resolve booking source (opening vs free-form) ───────────
   // When openingId is provided we trust it as the source of truth for
@@ -184,10 +194,11 @@ export async function POST(request: NextRequest) {
     .eq('id', instructorId)
     .single()
 
-  // Calculate price_cents for this lesson
+  // Calculate price_cents for this lesson. Observation rides along in a car
+  // already paid for by the driving student — it's free and earns nothing.
   const hours = durationMinutes / 60
   let priceCents = 0
-  if (instructorRecord) {
+  if (instructorRecord && lessonType === 'drive') {
     if (instructorRecord.modality === 'independent' && instructorRecord.lesson_price_cents) {
       priceCents = Math.round(instructorRecord.lesson_price_cents * hours)
     } else if (school) {
@@ -226,7 +237,7 @@ export async function POST(request: NextRequest) {
   // the booking as a claim — link it and CAS-flip below. Keeps the openings
   // table accurate without requiring the admin UI to know about openings.
   let matchedOpeningId: string | null = null
-  if (!openingId) {
+  if (!openingId && lessonType === 'drive') {
     const { data: exact } = await supabase
       .from('openings')
       .select('id')
@@ -250,7 +261,7 @@ export async function POST(request: NextRequest) {
 
   const { data: existingLessons } = await supabase
     .from('lessons')
-    .select('id, scheduled_at, duration_minutes, instructor_id, student_id, pickup_location, dropoff_location')
+    .select('id, scheduled_at, duration_minutes, instructor_id, student_id, lesson_type, pickup_location, dropoff_location')
     .eq('school_id', schoolId)
     .eq('status', 'scheduled')
     .gte('scheduled_at', dayStart.toISOString())
@@ -264,9 +275,17 @@ export async function POST(request: NextRequest) {
     const overlaps = exStart < lessonEnd && exEnd > lessonStart
 
     if (overlaps) {
-      if (ex.instructor_id === instructorId) {
+      // Per-type instructor conflict (mirrors the DB exclusion constraint):
+      // one drive + one observation may share the instructor's slot — that's
+      // the ride-along — but never two of the same type.
+      if (ex.instructor_id === instructorId && ex.lesson_type === lessonType) {
         return NextResponse.json(
-          { error: 'Instructor already has a lesson at this time.' },
+          {
+            error:
+              lessonType === 'observation'
+                ? 'This drive lesson already has an observer.'
+                : 'Instructor already has a lesson at this time.',
+          },
           { status: 409 }
         )
       }
@@ -279,15 +298,40 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // ── Observation pairing ─────────────────────────────────────
+  // An observation only makes sense inside a car that's actually out on a
+  // drive: require an existing scheduled drive lesson for this instructor
+  // that fully covers the observation window, and link to it.
+  let pairedLessonId: string | null = null
+  if (lessonType === 'observation') {
+    const pairedDrive = (existingLessons ?? []).find(ex => {
+      if (ex.instructor_id !== instructorId || ex.lesson_type !== 'drive') return false
+      const exStart = new Date(ex.scheduled_at)
+      const exEnd = new Date(exStart.getTime() + ex.duration_minutes * 60 * 1000)
+      return exStart <= lessonStart && exEnd >= lessonEnd
+    })
+    if (!pairedDrive) {
+      return NextResponse.json(
+        {
+          error:
+            'Observation must take place during an existing drive lesson with this instructor. Book the drive lesson first.',
+        },
+        { status: 409 }
+      )
+    }
+    pairedLessonId = pairedDrive.id
+  }
+
   // ── Travel time check ───────────────────────────────────────
   // Runs for BOTH free-form and opening-based bookings. The regenerator only
   // avoids strict overlap, so a published opening can still be impossible to
   // reach from the previous lesson's drop-off. We block here; the student sees
   // a 409 after clicking. (Long-term cleanup: teach the regenerator to carve
   // around lessons with buffer/travel so this is rare.)
-  const bufferMinutes = instructorRecord?.buffer_minutes ?? 0
+  // Observation rides in the drive lesson's car — no travel of its own.
+  const bufferMinutes = lessonType === 'drive' ? (instructorRecord?.buffer_minutes ?? 0) : 0
 
-  const sameInstructorToday = (existingLessons ?? [])
+  const sameInstructorToday = (lessonType === 'drive' ? existingLessons ?? [] : [])
     .filter(ex => ex.instructor_id === instructorId)
     .map(ex => {
       const exStart = new Date(ex.scheduled_at).getTime()
@@ -367,6 +411,8 @@ export async function POST(request: NextRequest) {
       vehicle_id: vehicleId ?? null,
       scheduled_at: scheduledAt,
       duration_minutes: durationMinutes,
+      lesson_type: lessonType,
+      paired_lesson_id: pairedLessonId,
       notes_covered: notesCovered ?? '',
       notes_practice: notesPractice ?? '',
       notes_additional: notesAdditional ?? '',
@@ -400,13 +446,17 @@ export async function POST(request: NextRequest) {
   // lesson are now unbookable — flip them to 'blocked' so they don't show up
   // on the student book screen. We exclude the one we just claimed (that's
   // already 'booked'). Idempotent: only flips status='available' rows.
-  const { data: nearbyOpenings } = await adminClient
-    .from('openings')
-    .select('id, scheduled_at, duration_minutes')
-    .eq('instructor_id', instructorId)
-    .eq('status', 'available')
-    .gte('scheduled_at', dayStart.toISOString())
-    .lt('scheduled_at', dayEnd.toISOString())
+  // Observation doesn't occupy the instructor's bookable time (the paired
+  // drive lesson already blocked these openings) and consumes no credit.
+  const { data: nearbyOpenings } = lessonType === 'drive'
+    ? await adminClient
+        .from('openings')
+        .select('id, scheduled_at, duration_minutes')
+        .eq('instructor_id', instructorId)
+        .eq('status', 'available')
+        .gte('scheduled_at', dayStart.toISOString())
+        .lt('scheduled_at', dayEnd.toISOString())
+    : { data: [] as { id: string; scheduled_at: string; duration_minutes: number }[] }
 
   const overlappingIds = (nearbyOpenings ?? [])
     .filter(o => {
@@ -424,12 +474,14 @@ export async function POST(request: NextRequest) {
       .eq('status', 'available')
   }
 
-  // Decrement lessons_remaining for the student
-  const { data: studentRecord2 } = await adminClient
-    .from('students')
-    .select('lessons_remaining')
-    .eq('id', studentId)
-    .single()
+  // Decrement lessons_remaining for the student (drive only — observation is free)
+  const { data: studentRecord2 } = lessonType === 'drive'
+    ? await adminClient
+        .from('students')
+        .select('lessons_remaining')
+        .eq('id', studentId)
+        .single()
+    : { data: null }
 
   if (studentRecord2 && studentRecord2.lessons_remaining > 0) {
     await adminClient

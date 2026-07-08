@@ -58,7 +58,7 @@ export async function PATCH(
   // Verify the lesson belongs to this school
   const { data: existing } = await supabase
     .from('lessons')
-    .select('id, status, instructor_id, student_id, scheduled_at, duration_minutes, school_id, sold_by, price_cents, pickup_location, dropoff_location, opening_id')
+    .select('id, status, instructor_id, student_id, scheduled_at, duration_minutes, school_id, sold_by, price_cents, pickup_location, dropoff_location, opening_id, lesson_type')
     .eq('id', id)
     .eq('school_id', profile.school_id)
     .single()
@@ -122,7 +122,7 @@ export async function PATCH(
 
     const { data: conflicts } = await supabase
       .from('lessons')
-      .select('id, scheduled_at, duration_minutes, instructor_id, student_id, pickup_location, dropoff_location')
+      .select('id, scheduled_at, duration_minutes, instructor_id, student_id, lesson_type, pickup_location, dropoff_location')
       .eq('school_id', profile.school_id)
       .eq('status', 'scheduled')
       .neq('id', id) // exclude the current lesson
@@ -135,7 +135,9 @@ export async function PATCH(
       const overlaps = exStart < newEnd && exEnd > newStart
 
       if (overlaps) {
-        if (ex.instructor_id === existing.instructor_id) {
+        // Same-type check mirrors the DB exclusion constraint: a drive and an
+        // observation may share the instructor's slot (ride-along).
+        if (ex.instructor_id === existing.instructor_id && ex.lesson_type === existing.lesson_type) {
           return NextResponse.json(
             { error: 'Instructor already has a lesson at this time.' },
             { status: 409 }
@@ -150,15 +152,37 @@ export async function PATCH(
       }
     }
 
-    // Travel time check (ZIP-prefix heuristic) for back-to-back lessons
+    // A rescheduled observation must still ride inside a scheduled drive
+    // lesson of the same instructor (same pairing rule as creation).
+    if (existing.lesson_type === 'observation') {
+      const coveringDrive = (conflicts ?? []).find(ex => {
+        if (ex.instructor_id !== existing.instructor_id || ex.lesson_type !== 'drive') return false
+        const exStart = new Date(ex.scheduled_at)
+        const exEnd = new Date(exStart.getTime() + ex.duration_minutes * 60 * 1000)
+        return exStart <= newStart && exEnd >= newEnd
+      })
+      if (!coveringDrive) {
+        return NextResponse.json(
+          {
+            error:
+              'Observation must take place during an existing drive lesson with this instructor.',
+          },
+          { status: 409 }
+        )
+      }
+      lessonUpdatesPairedLessonId = coveringDrive.id
+    }
+
+    // Travel time check (ZIP-prefix heuristic) for back-to-back lessons.
+    // Observation lessons ride in the drive lesson's car — no travel of their own.
     const { data: instructorRecord } = await supabase
       .from('instructors')
       .select('buffer_minutes')
       .eq('id', existing.instructor_id)
       .single()
-    const bufferMinutes = instructorRecord?.buffer_minutes ?? 0
+    const bufferMinutes = existing.lesson_type === 'drive' ? (instructorRecord?.buffer_minutes ?? 0) : 0
 
-    const sameInstructorToday = (conflicts ?? [])
+    const sameInstructorToday = (existing.lesson_type === 'drive' ? conflicts ?? [] : [])
       .filter(ex => ex.instructor_id === existing.instructor_id)
       .map(ex => {
         const exStart = new Date(ex.scheduled_at).getTime()
