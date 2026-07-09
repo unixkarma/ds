@@ -4,6 +4,7 @@
 
 import { Resend } from 'resend'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { resolveTemplateOverride, sendRawEmail } from '@/lib/email/render'
 
 export interface PackageConfirmationArgs {
   to: string
@@ -249,10 +250,38 @@ export async function notifyPackagePurchase(args: NotifyPurchaseArgs): Promise<v
       .eq('id', args.schoolId)
       .single<{ name: string; email: string | null }>()
 
+    const studentName = `${userRow.first_name} ${userRow.last_name}`.trim() || 'there'
+    const schoolName = school?.name ?? 'Your driving school'
+
+    // School-defined template takes precedence over the hardcoded builder.
+    const override = await resolveTemplateOverride(args.client, args.schoolId, 'package_confirmation', {
+      studentName,
+      schoolName,
+      packageName: args.packageName,
+      lessonCount: String(args.lessonCount),
+      lessonsActivated: String(args.lessonsActivated),
+      classroomRequired: String(args.classroomRequired),
+      pricePaid: `$${(args.pricePaidCents / 100).toFixed(2)}`,
+      totalPrice: `$${(args.totalPriceCents / 100).toFixed(2)}`,
+      discount: `$${(args.discountCents / 100).toFixed(2)}`,
+      requirements: args.requirements ?? '',
+      receiptUrl: args.receiptUrl ?? '',
+    })
+    if (override) {
+      await sendRawEmail({
+        to: userRow.email,
+        replyTo: school?.email ?? null,
+        subject: override.subject,
+        html: override.html,
+        text: override.text,
+      })
+      return
+    }
+
     await sendPackageConfirmationEmail({
       to: userRow.email,
-      studentName: `${userRow.first_name} ${userRow.last_name}`.trim() || 'there',
-      schoolName: school?.name ?? 'Your driving school',
+      studentName,
+      schoolName,
       schoolEmail: school?.email ?? null,
       packageName: args.packageName,
       lessonCount: args.lessonCount,

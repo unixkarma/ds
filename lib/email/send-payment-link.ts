@@ -6,6 +6,7 @@
 
 import { Resend } from 'resend'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { resolveTemplateOverride, sendRawEmail } from '@/lib/email/render'
 
 export type PaymentLinkMode = 'package' | 'balance'
 
@@ -205,10 +206,35 @@ export async function notifyPaymentLink(
       .eq('id', args.schoolId)
       .single<{ name: string; email: string | null }>()
 
+    const studentName = `${userRow.first_name} ${userRow.last_name}`.trim() || 'there'
+    const schoolName = school?.name ?? 'Your driving school'
+
+    // School-defined template takes precedence over the hardcoded builder.
+    const override = await resolveTemplateOverride(args.client, args.schoolId, 'payment_link', {
+      studentName,
+      schoolName,
+      packageName: args.packageName ?? '',
+      lessonCount: String(args.lessonCount),
+      price: `$${(args.priceCents / 100).toFixed(2)}`,
+      surcharge: `$${(args.surchargeCents / 100).toFixed(2)}`,
+      total: `$${(args.totalCents / 100).toFixed(2)}`,
+      checkoutUrl: args.checkoutUrl,
+    })
+    if (override) {
+      const result = await sendRawEmail({
+        to: userRow.email,
+        replyTo: school?.email ?? null,
+        subject: override.subject,
+        html: override.html,
+        text: override.text,
+      })
+      return { ...result, to: userRow.email }
+    }
+
     const result = await sendPaymentLinkEmail({
       to: userRow.email,
-      studentName: `${userRow.first_name} ${userRow.last_name}`.trim() || 'there',
-      schoolName: school?.name ?? 'Your driving school',
+      studentName,
+      schoolName,
       schoolEmail: school?.email ?? null,
       mode: args.mode,
       packageName: args.packageName,

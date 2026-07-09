@@ -485,3 +485,147 @@ export interface ClassroomSessionWithRelations extends ClassroomSession {
   instructor: InstructorWithUser | null
   attendance: ClassroomAttendanceWithStudent[]
 }
+
+// ── Communication Center (migration 043) ─────────────────────
+// Keys correspond to the hardcoded builders in lib/email/*. A row overrides
+// the default when enabled; otherwise the builder's HTML is used as fallback.
+export type EmailTemplateKey =
+  | 'package_confirmation'
+  | 'payment_link'
+  | 'day_off_decision'
+
+export interface EmailTemplate {
+  id: string
+  school_id: string
+  template_key: EmailTemplateKey
+  subject: string
+  html_body: string
+  text_body: string
+  enabled: boolean
+  updated_at: string
+}
+
+export type MessageDirection = 'outbound' | 'inbound'
+export type MessageChannel = 'email'
+export type MessageStatus = 'sent' | 'failed' | 'received'
+
+export interface Message {
+  id: string
+  school_id: string
+  student_id: string
+  direction: MessageDirection
+  channel: MessageChannel
+  subject: string
+  body: string
+  status: MessageStatus
+  sent_by: string | null
+  created_at: string
+}
+
+export type BroadcastAudience = 'students' | 'staff'
+
+export interface Broadcast {
+  id: string
+  school_id: string
+  audience: BroadcastAudience
+  subject: string
+  body: string
+  recipient_count: number
+  sent_by: string | null
+  created_at: string
+}
+
+// ── State compliance reporting (migration 044) ───────────────
+export type StateReportType = 'il_sos_roster' | 'attendance_sheet' | 'staff_time_off'
+
+export interface StateReportSubmission {
+  id: string
+  school_id: string
+  report_type: StateReportType
+  period_start: string | null
+  period_end: string | null
+  student_count: number
+  csv_url: string | null
+  generated_by: string | null
+  created_at: string
+}
+
+// ── Quizzes / knowledge tests (migration 045) ────────────────
+export interface Quiz {
+  id: string
+  school_id: string
+  title: string
+  topic: string
+  passing_score: number
+  active: boolean
+  created_at: string
+}
+
+export interface QuizAttempt {
+  id: string
+  school_id: string
+  quiz_id: string
+  student_id: string
+  score: number
+  passed: boolean
+  taken_at: string
+  recorded_by: string | null
+  created_at: string
+}
+
+export interface QuizAttemptWithQuiz extends QuizAttempt {
+  quiz: Quiz
+}
+
+// ── Student documents (migration 046) ────────────────────────
+export type StudentDocumentType =
+  | 'permit'
+  | 'id'
+  | 'medical'
+  | 'parental_consent'
+  | 'certificate'
+  | 'other'
+
+export interface StudentDocument {
+  id: string
+  school_id: string
+  student_id: string
+  doc_type: StudentDocumentType
+  file_path: string
+  file_name: string
+  uploaded_by: string | null
+  created_at: string
+}
+
+// A document row with a freshly-minted short-lived signed URL for download.
+export interface StudentDocumentWithUrl extends StudentDocument {
+  signed_url: string | null
+}
+
+// ── Graphical scheduler grid (migration-free; aggregation) ───
+export type ScheduleGridView =
+  | 'single-instructor'
+  | 'single-location'
+  | 'multi-instructor'
+
+export interface ScheduleGridSlot {
+  id: string
+  start: string          // ISO timestamp
+  duration_minutes: number
+  kind: 'opening' | 'lesson' | 'day-off'
+  status: string         // opening/lesson status, or 'off'
+  student_name?: string
+  location?: string
+}
+
+export interface ScheduleGridRow {
+  instructor_id: string
+  instructor_name: string
+  slots: ScheduleGridSlot[]
+}
+
+export interface ScheduleGridData {
+  date: string           // YYYY-MM-DD
+  view: ScheduleGridView
+  rows: ScheduleGridRow[]
+}

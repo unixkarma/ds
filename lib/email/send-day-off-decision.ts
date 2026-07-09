@@ -3,6 +3,7 @@
 
 import { Resend } from 'resend'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { resolveTemplateOverride, sendRawEmail } from '@/lib/email/render'
 
 export type DayOffDecision = 'approved' | 'rejected'
 
@@ -167,10 +168,33 @@ export async function notifyDayOffDecision(
       .eq('id', args.schoolId)
       .single<{ name: string; email: string | null }>()
 
+    const instructorName = `${userRow.first_name} ${userRow.last_name}`.trim() || 'there'
+    const schoolName = school?.name ?? 'Your driving school'
+
+    // School-defined template takes precedence over the hardcoded builder.
+    const override = await resolveTemplateOverride(args.client, args.schoolId, 'day_off_decision', {
+      instructorName,
+      schoolName,
+      date: formatDate(args.date),
+      decision: args.decision,
+      status: args.decision === 'approved' ? 'Approved' : 'Rejected',
+      reason: args.reason ?? '',
+    })
+    if (override) {
+      const result = await sendRawEmail({
+        to: userRow.email,
+        replyTo: school?.email ?? null,
+        subject: override.subject,
+        html: override.html,
+        text: override.text,
+      })
+      return { ...result, to: userRow.email }
+    }
+
     const result = await sendDayOffDecisionEmail({
       to: userRow.email,
-      instructorName: `${userRow.first_name} ${userRow.last_name}`.trim() || 'there',
-      schoolName: school?.name ?? 'Your driving school',
+      instructorName,
+      schoolName,
       schoolEmail: school?.email ?? null,
       decision: args.decision,
       date: args.date,

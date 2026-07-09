@@ -87,6 +87,11 @@ export async function PATCH(
   // Re-validate conflicts/travel whenever the lesson's footprint changes —
   // either its start time (reschedule) or its duration (a longer lesson can
   // eat into the next lesson's buffer/travel gap).
+  //
+  // When a rescheduled observation finds a new covering drive, we re-point its
+  // paired_lesson_id; captured here in the outer scope so it survives into the
+  // lessonUpdates payload built below.
+  let lessonUpdatesPairedLessonId: string | null = null
   if (updates.scheduledAt || updates.durationMinutes) {
     const newStart = new Date(updates.scheduledAt ?? existing.scheduled_at)
     const newDuration = updates.durationMinutes ?? existing.duration_minutes
@@ -247,6 +252,8 @@ export async function PATCH(
   if (updates.notesAdditional !== undefined) lessonUpdates.notes_additional = updates.notesAdditional
   if (updates.pickupLocation !== undefined) lessonUpdates.pickup_location = updates.pickupLocation
   if (updates.dropoffLocation !== undefined) lessonUpdates.dropoff_location = updates.dropoffLocation
+  // Persist the re-paired covering drive for a rescheduled observation.
+  if (lessonUpdatesPairedLessonId !== null) lessonUpdates.paired_lesson_id = lessonUpdatesPairedLessonId
 
   // ── Calculate instructor earnings when marking complete ─────
   if (updates.status === 'completed' && existing.status !== 'completed') {
