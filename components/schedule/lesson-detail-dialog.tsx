@@ -26,7 +26,14 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import type { LessonWithRelations, LessonStatus } from '@/types'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import type { LessonWithRelations, LessonStatus, StudentWithUser } from '@/types'
 
 const STATUS_BADGE: Record<LessonStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   scheduled: 'default',
@@ -37,10 +44,11 @@ const STATUS_BADGE: Record<LessonStatus, 'default' | 'secondary' | 'destructive'
 
 interface LessonDetailDialogProps {
   lesson: LessonWithRelations | null
+  students?: StudentWithUser[]
   onClose: () => void
 }
 
-export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps) {
+export function LessonDetailDialog({ lesson, students = [], onClose }: LessonDetailDialogProps) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [isCancelling, setIsCancelling] = useState(false)
@@ -50,12 +58,20 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false)
   const [rescheduleDate, setRescheduleDate] = useState('')
   const [rescheduleTime, setRescheduleTime] = useState('')
+  const [showAddObserver, setShowAddObserver] = useState(false)
+  const [observerStudentId, setObserverStudentId] = useState('')
+  const [isAddingObserver, setIsAddingObserver] = useState(false)
 
   if (!lesson) return null
 
   const lessonStart = new Date(lesson.scheduled_at)
   const lessonEnd = new Date(lessonStart.getTime() + lesson.duration_minutes * 60 * 1000)
   const isScheduled = lesson.status === 'scheduled'
+  const isObservation = lesson.lesson_type === 'observation'
+  // An observer can be added to a scheduled DRIVE lesson: a second student rides
+  // along in the same car/slot and accrues observation hours. Exclude the driver.
+  const canAddObserver = isScheduled && lesson.lesson_type === 'drive'
+  const observerCandidates = students.filter(s => s.id !== lesson.student_id)
 
   function openReschedule() {
     // Pre-fill with the lesson's current date/time so the user can tweak instead of filling blank
@@ -140,12 +156,50 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
     }
   }
 
+  async function handleAddObserver() {
+    if (!observerStudentId) {
+      setError('Please select a student to observe.')
+      return
+    }
+    setIsAddingObserver(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/lessons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId: observerStudentId,
+          instructorId: lesson!.instructor_id,
+          scheduledAt: lesson!.scheduled_at,
+          durationMinutes: lesson!.duration_minutes,
+          vehicleId: lesson!.vehicle?.id ?? null,
+          pickupLocation: lesson!.pickup_location ?? '',
+          dropoffLocation: lesson!.dropoff_location ?? '',
+          lessonType: 'observation',
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        setError(data.error ?? 'Failed to add observer.')
+        return
+      }
+      onClose()
+      router.refresh()
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setIsAddingObserver(false)
+    }
+  }
+
   function handleOpenChange(open: boolean) {
     if (!open) {
       setError(null)
       setShowReschedule(false)
       setRescheduleDate('')
       setRescheduleTime('')
+      setShowAddObserver(false)
+      setObserverStudentId('')
       onClose()
     }
   }
@@ -170,7 +224,17 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
             </Badge>
           </Row>
 
-          <Row label="Student">
+          <Row label="Type">
+            {isObservation ? (
+              <Badge variant="outline" className="border-violet-300 bg-violet-50 text-violet-700 dark:border-violet-800 dark:bg-violet-950/40 dark:text-violet-300">
+                Observation (ride-along)
+              </Badge>
+            ) : (
+              <span>Behind-the-wheel</span>
+            )}
+          </Row>
+
+          <Row label={isObservation ? 'Observer' : 'Student'}>
             {lesson.student.user.first_name} {lesson.student.user.last_name}
           </Row>
 
@@ -287,8 +351,53 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
           </div>
         )}
 
+        {/* Add-observer form */}
+        {showAddObserver && (
+          <div className="border rounded-lg p-3 space-y-3">
+            <div>
+              <p className="text-sm font-medium">Add an observer</p>
+              <p className="text-muted-foreground text-xs mt-0.5">
+                A second student rides along in this car and accrues observation
+                hours. They aren&apos;t charged and don&apos;t use a lesson credit.
+              </p>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Student</Label>
+              <Select value={observerStudentId} onValueChange={setObserverStudentId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a student" />
+                </SelectTrigger>
+                <SelectContent>
+                  {observerCandidates.map(s => (
+                    <SelectItem key={s.id} value={s.id}>
+                      {s.user.first_name} {s.user.last_name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleAddObserver} disabled={isAddingObserver}>
+                {isAddingObserver && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                Add observer
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setShowAddObserver(false)
+                  setObserverStudentId('')
+                  setError(null)
+                }}
+              >
+                Go back
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Action buttons — only for scheduled lessons */}
-        {isScheduled && !showReschedule && (
+        {isScheduled && !showReschedule && !showAddObserver && (
           <div className="flex flex-wrap gap-2 pt-1">
             <Button
               size="sm"
@@ -314,6 +423,18 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
             >
               Reschedule
             </Button>
+            {canAddObserver && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setShowAddObserver(true)
+                  setError(null)
+                }}
+              >
+                Add observer
+              </Button>
+            )}
             <Button
               variant="destructive"
               size="sm"

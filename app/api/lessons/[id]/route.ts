@@ -256,7 +256,9 @@ export async function PATCH(
   if (lessonUpdatesPairedLessonId !== null) lessonUpdates.paired_lesson_id = lessonUpdatesPairedLessonId
 
   // ── Calculate instructor earnings when marking complete ─────
-  if (updates.status === 'completed' && existing.status !== 'completed') {
+  // Observation lessons ride along in the drive lesson's car — they earn the
+  // instructor nothing, so their instructor_earning_cents stays at 0.
+  if (updates.status === 'completed' && existing.status !== 'completed' && existing.lesson_type === 'drive') {
     const { data: instructor } = await adminClient
       .from('instructors')
       .select('modality, hourly_rate_cents, commission_rate')
@@ -303,8 +305,9 @@ export async function PATCH(
     lessonUpdates.cancelled_by = cancelledBy
 
     // A fee only applies when cancelling within the 24h window. Cancelling
-    // 48h+ ahead is free; 12h ahead is charged.
-    if (cancelledBy !== 'admin' && withinFeeWindow) {
+    // 48h+ ahead is free; 12h ahead is charged. Observation ride-alongs are
+    // free and never carry a cancellation fee.
+    if (cancelledBy !== 'admin' && withinFeeWindow && existing.lesson_type === 'drive') {
       const { data: school } = await adminClient
         .from('schools')
         .select('student_cancellation_fee_cents, instructor_cancellation_fee_cents')
@@ -329,7 +332,8 @@ export async function PATCH(
   // ── No-show fee ─────────────────────────────────────────────
   // Marking a no-show charges a configurable fee to the student. The lesson
   // credit is refunded below (the student keeps the lesson, only loses the fee).
-  if (updates.status === 'no_show' && existing.status !== 'no_show') {
+  // Observation ride-alongs are free — no fee, and no credit to refund.
+  if (updates.status === 'no_show' && existing.status !== 'no_show' && existing.lesson_type === 'drive') {
     const { data: school } = await adminClient
       .from('schools')
       .select('student_no_show_fee_cents')
@@ -351,7 +355,8 @@ export async function PATCH(
     !updates.status &&
     existing.status === 'scheduled' &&
     updates.cancelledBy === 'student' &&
-    withinFeeWindow
+    withinFeeWindow &&
+    existing.lesson_type === 'drive'
   ) {
     const { data: school } = await adminClient
       .from('schools')
@@ -386,7 +391,8 @@ export async function PATCH(
   }
 
   // No-show refunds the lesson credit (student keeps the lesson, only pays the fee).
-  if (updates.status === 'no_show' && existing.status === 'scheduled') {
+  // Observation never consumed a credit, so there is nothing to refund.
+  if (updates.status === 'no_show' && existing.status === 'scheduled' && existing.lesson_type === 'drive') {
     const { data: student } = await adminClient
       .from('students')
       .select('lessons_remaining')
@@ -401,25 +407,51 @@ export async function PATCH(
     }
   }
 
-  // When marking a lesson as completed, increment the student's completed lesson count
+  // When marking a lesson as completed, update the student's compliance counters.
+  // A completed DRIVE bumps total_lessons_completed (the 6h behind-the-wheel count).
+  // A completed OBSERVATION instead adds its clock minutes to
+  // observation_minutes_completed (the separate 6h ride-along requirement) and
+  // does NOT touch total_lessons_completed.
   if (updates.status === 'completed' && existing.status !== 'completed') {
-    const { data: student } = await adminClient
-      .from('students')
-      .select('total_lessons_completed')
-      .eq('id', existing.student_id)
-      .single()
-
-    if (student) {
-      await adminClient
+    if (existing.lesson_type === 'observation') {
+      const { data: student } = await adminClient
         .from('students')
-        .update({ total_lessons_completed: student.total_lessons_completed + 1 })
+        .select('observation_minutes_completed')
         .eq('id', existing.student_id)
+        .single()
+
+      if (student) {
+        await adminClient
+          .from('students')
+          .update({
+            observation_minutes_completed:
+              student.observation_minutes_completed + existing.duration_minutes,
+          })
+          .eq('id', existing.student_id)
+      }
+    } else {
+      const { data: student } = await adminClient
+        .from('students')
+        .select('total_lessons_completed')
+        .eq('id', existing.student_id)
+        .single()
+
+      if (student) {
+        await adminClient
+          .from('students')
+          .update({ total_lessons_completed: student.total_lessons_completed + 1 })
+          .eq('id', existing.student_id)
+      }
     }
   }
 
-  // When cancelling a scheduled lesson, refund the lesson credit back to the student
-  // and release any opening it was attached to so other students can grab it.
-  if (updates.status === 'cancelled' && existing.status === 'scheduled') {
+  // When cancelling a scheduled DRIVE lesson, refund the lesson credit back to the
+  // student and release any opening it was attached to so other students can grab it.
+  // Observation ride-alongs consumed no credit, held no opening, and blocked no
+  // openings (the paired drive owns all of that), so none of this applies — and
+  // running the unblock sweep would wrongly free openings the still-scheduled
+  // drive is holding.
+  if (updates.status === 'cancelled' && existing.status === 'scheduled' && existing.lesson_type === 'drive') {
     const { data: student } = await adminClient
       .from('students')
       .select('lessons_remaining')
@@ -477,6 +509,19 @@ export async function PATCH(
         .in('id', toUnblock)
         .eq('status', 'blocked')
     }
+  }
+
+  // If we just cancelled a DRIVE that had an observer riding along, cancel the
+  // paired observation too — it can't ride in a cancelled car. It's free, so no
+  // fee and no credit change; left unattributed (a system cascade, not a
+  // student/instructor cancellation).
+  if (updates.status === 'cancelled' && existing.status === 'scheduled' && existing.lesson_type === 'drive') {
+    await adminClient
+      .from('lessons')
+      .update({ status: 'cancelled', cancelled_at: new Date().toISOString() })
+      .eq('paired_lesson_id', id)
+      .eq('lesson_type', 'observation')
+      .eq('status', 'scheduled')
   }
 
   return NextResponse.json({ success: true })

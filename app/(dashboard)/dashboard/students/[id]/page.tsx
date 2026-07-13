@@ -150,6 +150,14 @@ export default async function StudentDetailPage({
                 <span className="text-muted-foreground">Completed</span>
                 <span className="font-medium">{student.total_lessons_completed}</span>
               </div>
+              {(student.age_group === 'teen' || student.observation_minutes_completed > 0) && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Observation hours</span>
+                  <span className="font-medium">
+                    {(student.observation_minutes_completed / 60).toFixed(1)} h
+                  </span>
+                </div>
+              )}
               <Separator />
               <div className="flex justify-between">
                 <span className="font-medium">Remaining</span>

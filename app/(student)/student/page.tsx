@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import { format } from 'date-fns'
-import { AlertTriangle, CalendarDays, CheckCircle, Clock, BookOpen, Wallet, GraduationCap } from 'lucide-react'
+import { AlertTriangle, CalendarDays, CheckCircle, Clock, BookOpen, Wallet, GraduationCap, Eye } from 'lucide-react'
 import Link from 'next/link'
 
 import { getStudentPortalData } from '@/lib/services/student-portal'
@@ -120,6 +120,26 @@ export default async function StudentPortalPage() {
             >
               {classroomAttended}/{classroomRequired}
             </Link>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Observation progress (behind-the-wheel ride-along hours — IL teens need 6h) */}
+      {(student.age_group === 'teen' || student.observation_minutes_completed > 0) && (
+        <Card>
+          <CardContent className="pt-5 pb-5 flex items-center gap-4">
+            <Eye className="h-6 w-6 text-violet-500 shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium">Observation Hours</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {(student.observation_minutes_completed / 60).toFixed(1)} of 6.0 hours completed
+                {student.observation_minutes_completed < 360 &&
+                  ` · ${((360 - student.observation_minutes_completed) / 60).toFixed(1)} remaining`}
+              </p>
+            </div>
+            <span className="text-2xl font-bold tabular-nums shrink-0">
+              {(student.observation_minutes_completed / 60).toFixed(1)}h
+            </span>
           </CardContent>
         </Card>
       )}

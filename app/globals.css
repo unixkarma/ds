@@ -48,76 +48,82 @@
 }
 
 :root {
-  --radius: 0.625rem;
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  /* HelixDriving brand — blue primary (validated categorical slot 1). */
-  --primary: #2a78d6;
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: #2a78d6;
-  /* Categorical chart palette — validated (CVD-safe) for the light surface. */
+  /* HelixDriving — "Soft Pastel" theme. Warm off-white base, dusty-blue primary,
+     sage/blush/lavender accents. Surfaces are pastel; text stays AA-legible.
+     See /ui-design skill for the rationale behind every token. */
+  --radius: 0.75rem;
+  --background: #faf9f7;            /* warm off-white */
+  --foreground: #2b2a31;           /* warm near-black — AA on all surfaces */
+  --card: #ffffff;                 /* crisp white lifts gently off the base */
+  --card-foreground: #2b2a31;
+  --popover: #ffffff;
+  --popover-foreground: #2b2a31;
+  /* Dusty-blue primary. Foreground is dark navy (NOT white): pastel primary is
+     too light for white text to hit AA — dark-on-pastel is the intended look. */
+  --primary: #6e9cc6;
+  --primary-foreground: #17222b;
+  --secondary: #eef3ea;            /* soft sage tint */
+  --secondary-foreground: #33402e;
+  --muted: #f1efec;                /* warm gray */
+  --muted-foreground: #63616b;     /* AA (4.5:1+) on card and base */
+  --accent: #f3eaf3;              /* light lavender — hover/selected surfaces */
+  --accent-foreground: #3a3145;
+  --destructive: #bb5049;          /* muted brick-rose; white text passes AA */
+  --border: #e7e3de;               /* warm hairline */
+  --input: #e7e3de;
+  --ring: #6e9cc6;
+  /* Categorical chart palette — KEPT as the validated CVD-safe set on purpose.
+     Low-chroma pastels are indistinguishable in dense charts; do NOT pastel-ify. */
   --chart-1: #2a78d6;
   --chart-2: #1baf7a;
   --chart-3: #eda100;
   --chart-4: #008300;
   --chart-5: #4a3aa7;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: #2a78d6;
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: #2a78d6;
+  --sidebar: #eef2e9;              /* sage-tinted rail — the "boutique" signature */
+  --sidebar-foreground: #2b2a31;
+  --sidebar-primary: #6e9cc6;
+  --sidebar-primary-foreground: #17222b;
+  --sidebar-accent: #e3eadc;       /* deeper sage for the active item */
+  --sidebar-accent-foreground: #2e3a29;
+  --sidebar-border: #dee5d6;
+  --sidebar-ring: #6e9cc6;
 }
 
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  /* HelixDriving brand — blue primary, stepped for the dark surface. */
-  --primary: #3987e5;
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
+  /* Warm near-black base (not pure #000); pastels lighten one step to glow on dark. */
+  --background: #17161a;
+  --foreground: #eceaf0;           /* soft off-white, never harsh #fff */
+  --card: #201f25;                 /* warm elevated surface */
+  --card-foreground: #eceaf0;
+  --popover: #201f25;
+  --popover-foreground: #eceaf0;
+  /* Lighter dusty blue reads as pastel on dark; dark navy foreground keeps AA. */
+  --primary: #9dbedc;
+  --primary-foreground: #12202b;
+  --secondary: #2a2a31;
+  --secondary-foreground: #eceaf0;
+  --muted: #2a2a31;
+  --muted-foreground: #a6a2b0;     /* AA on the dark card/base */
+  --accent: #2e2a33;              /* lavender-tinted hover surface */
+  --accent-foreground: #eceaf0;
+  --destructive: #d98a82;          /* soft rose; dark text via button on dark */
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
-  --ring: #3987e5;
+  --ring: #9dbedc;
   /* Categorical chart palette — validated (CVD-safe) for the dark surface. */
   --chart-1: #3987e5;
   --chart-2: #199e70;
   --chart-3: #c98500;
   --chart-4: #008300;
   --chart-5: #9085e9;
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: #3987e5;
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar: #1c1b21;              /* a hair off the base so the rail reads */
+  --sidebar-foreground: #eceaf0;
+  --sidebar-primary: #9dbedc;
+  --sidebar-primary-foreground: #12202b;
+  --sidebar-accent: #2c2b33;
+  --sidebar-accent-foreground: #eceaf0;
   --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: #3987e5;
+  --sidebar-ring: #9dbedc;
 }
 
 @layer base {
