@@ -1,6 +1,6 @@
 import { clsx, type ClassValue } from 'clsx'
 import { twMerge } from 'tailwind-merge'
-import { format, parseISO } from 'date-fns'
+import { format, parseISO, differenceInYears } from 'date-fns'
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -16,6 +16,12 @@ export function formatDate(date: string | Date, fmt = 'MMM d, yyyy'): string {
 export function formatDateTime(date: string | Date): string {
   const d = typeof date === 'string' ? parseISO(date) : date
   return format(d, 'MMM d, yyyy h:mm a')
+}
+
+// Age in whole years as of today, from a date of birth
+export function calculateAge(dateOfBirth: string | Date): number {
+  const d = typeof dateOfBirth === 'string' ? parseISO(dateOfBirth) : dateOfBirth
+  return differenceInYears(new Date(), d)
 }
 
 // Format cents to a display currency string

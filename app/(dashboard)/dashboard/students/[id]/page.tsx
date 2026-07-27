@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { Metadata } from 'next'
-import { ChevronLeft, Mail, Phone, Calendar, FileText, Pencil, ImageIcon, FileBarChart } from 'lucide-react'
+import { ChevronLeft, Mail, Phone, Calendar, MapPin, FileText, Pencil, ImageIcon, FileBarChart } from 'lucide-react'
 
 import { getStudentById } from '@/lib/services/students'
 import { getActivePackages } from '@/lib/services/packages'
@@ -12,7 +12,7 @@ import {
 } from '@/lib/services/student-ledger'
 import { getStudentPurchases } from '@/lib/services/student-purchases'
 import { getPermitPhotoSignedUrl } from '@/lib/storage/permit-photo'
-import { cn, formatCurrency, formatDate, formatDateTime, getFullName } from '@/lib/utils'
+import { cn, calculateAge, formatCurrency, formatDate, formatDateTime, getFullName } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -66,6 +66,11 @@ export default async function StudentDetailPage({
   const remaining = student.total_lessons_purchased - student.total_lessons_completed
   const statusConf = studentStatusConfig[student.status]
   const permitPhotoUrl = await getPermitPhotoSignedUrl(student.permit_photo_url)
+
+  const age = student.user.date_of_birth ? calculateAge(student.user.date_of_birth) : null
+  const address = [student.user.address, student.user.city, student.user.state, student.user.zip_code]
+    .filter(Boolean)
+    .join(', ')
 
   return (
     <div className="max-w-4xl space-y-6">
@@ -121,16 +126,23 @@ export default async function StudentDetailPage({
               <Calendar className="h-4 w-4 flex-shrink-0" />
               <span>
                 {student.user.date_of_birth
-                  ? formatDate(student.user.date_of_birth)
+                  ? `${formatDate(student.user.date_of_birth)}${age !== null ? ` (${age} years old)` : ''}`
                   : '—'}
               </span>
+            </div>
+            <div className="flex items-center gap-2 text-muted-foreground">
+              <MapPin className="h-4 w-4 flex-shrink-0" />
+              <span>{address || '—'}</span>
             </div>
             {student.notes && (
               <>
                 <Separator />
                 <div className="flex items-start gap-2 text-muted-foreground">
                   <FileText className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                  <span className="whitespace-pre-wrap">{student.notes}</span>
+                  <div>
+                    <p className="text-xs font-medium mb-0.5">Account Notes</p>
+                    <span className="whitespace-pre-wrap">{student.notes}</span>
+                  </div>
                 </div>
               </>
             )}
@@ -172,13 +184,13 @@ export default async function StudentDetailPage({
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Money Balance</CardTitle>
+              <CardTitle className="text-base">Account Balance</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 text-sm">
               <div className="flex justify-between items-baseline">
                 <span className="text-muted-foreground">
                   {balanceCents > 0
-                    ? 'Owes'
+                    ? 'Outstanding Balance'
                     : balanceCents < 0
                     ? 'Credit'
                     : 'Balance'}
@@ -283,6 +295,9 @@ export default async function StudentDetailPage({
                       Instructor
                     </th>
                     <th className="text-left font-medium text-muted-foreground pb-3 pr-4">
+                      Type
+                    </th>
+                    <th className="text-left font-medium text-muted-foreground pb-3 pr-4">
                       Duration
                     </th>
                     <th className="text-left font-medium text-muted-foreground pb-3">
@@ -300,6 +315,9 @@ export default async function StudentDetailPage({
                         </td>
                         <td className="py-3 pr-4">
                           {getFullName(lesson.instructor.user)}
+                        </td>
+                        <td className="py-3 pr-4 text-muted-foreground">
+                          {lesson.lesson_type === 'road_test' ? 'Road Test' : 'Regular'}
                         </td>
                         <td className="py-3 pr-4 text-muted-foreground">
                           {lesson.duration_minutes} min

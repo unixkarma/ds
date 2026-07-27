@@ -42,7 +42,7 @@ import type { AgeGroup, Package, InstructorWithUser } from '@/types'
 
 type Mode = 'package' | 'custom' | 'balance'
 type PaymentStatus = 'paid_full' | 'partial' | 'unpaid'
-type PaymentMethod = 'cash' | 'check' | 'other'
+type PaymentMethod = 'cash' | 'check' | 'card' | 'other'
 type SoldBy = 'operator' | 'instructor'
 
 const formSchema = z
@@ -53,7 +53,7 @@ const formSchema = z
     lessonCount: z.string().optional(),
     amountPaidDollars: z.string().optional(),
     discountDollars: z.string().optional(),
-    paymentMethod: z.enum(['cash', 'check', 'other']),
+    paymentMethod: z.enum(['cash', 'check', 'card', 'other']),
     description: z.string().max(200).optional(),
     soldBy: z.enum(['operator', 'instructor']),
     soldByInstructorId: z.string().optional(),
@@ -557,7 +557,7 @@ export function RecordPaymentDialog({
                 )}
               >
                 {currentBalanceCents > 0
-                  ? `Student currently owes ${formatCurrency(currentBalanceCents)}.`
+                  ? `Outstanding balance: ${formatCurrency(currentBalanceCents)}.`
                   : currentBalanceCents < 0
                   ? `Student has a credit of ${formatCurrency(-currentBalanceCents)}.`
                   : 'Student has no outstanding balance.'}
@@ -656,6 +656,7 @@ export function RecordPaymentDialog({
                 <SelectContent>
                   <SelectItem value="cash">Cash</SelectItem>
                   <SelectItem value="check">Check</SelectItem>
+                  <SelectItem value="card">Card (in person)</SelectItem>
                   <SelectItem value="other">Other</SelectItem>
                 </SelectContent>
               </Select>

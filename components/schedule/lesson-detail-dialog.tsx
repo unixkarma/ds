@@ -25,8 +25,18 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import type { LessonWithRelations, LessonStatus } from '@/types'
+import { DatePicker } from '@/components/ui/date-picker'
+import { getFullName } from '@/lib/utils'
+import type { LessonWithRelations, LessonStatus, InstructorWithUser } from '@/types'
 
 const STATUS_BADGE: Record<LessonStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   scheduled: 'default',
@@ -37,19 +47,26 @@ const STATUS_BADGE: Record<LessonStatus, 'default' | 'secondary' | 'destructive'
 
 interface LessonDetailDialogProps {
   lesson: LessonWithRelations | null
+  instructors: InstructorWithUser[]
   onClose: () => void
 }
 
-export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps) {
+export function LessonDetailDialog({ lesson, instructors, onClose }: LessonDetailDialogProps) {
   const router = useRouter()
   const [error, setError] = useState<string | null>(null)
   const [isCancelling, setIsCancelling] = useState(false)
   const [isRescheduling, setIsRescheduling] = useState(false)
   const [isMarkingStatus, setIsMarkingStatus] = useState(false)
+  const [isSavingEdit, setIsSavingEdit] = useState(false)
   const [showReschedule, setShowReschedule] = useState(false)
+  const [showEdit, setShowEdit] = useState(false)
   const [confirmCancelOpen, setConfirmCancelOpen] = useState(false)
   const [rescheduleDate, setRescheduleDate] = useState('')
   const [rescheduleTime, setRescheduleTime] = useState('')
+  const [editInstructorId, setEditInstructorId] = useState('')
+  const [editPickup, setEditPickup] = useState('')
+  const [editDropoff, setEditDropoff] = useState('')
+  const [editNotes, setEditNotes] = useState('')
 
   if (!lesson) return null
 
@@ -63,6 +80,44 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
     setRescheduleTime(format(lessonStart, 'HH:mm'))
     setShowReschedule(true)
     setError(null)
+  }
+
+  function openEdit() {
+    setEditInstructorId(lesson!.instructor_id)
+    setEditPickup(lesson!.pickup_location)
+    setEditDropoff(lesson!.dropoff_location)
+    setEditNotes(lesson!.notes_additional)
+    setShowEdit(true)
+    setError(null)
+  }
+
+  async function handleSaveEdit() {
+    setIsSavingEdit(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/lessons/${lesson!.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instructorId: editInstructorId !== lesson!.instructor_id ? editInstructorId : undefined,
+          pickupLocation: editPickup,
+          dropoffLocation: editDropoff,
+          notesAdditional: editNotes,
+        }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        setError(data.error ?? 'Failed to update lesson.')
+        return
+      }
+      setShowEdit(false)
+      onClose()
+      router.refresh()
+    } catch {
+      setError('Network error. Please try again.')
+    } finally {
+      setIsSavingEdit(false)
+    }
   }
 
   async function handleCancel() {
@@ -144,6 +199,7 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
     if (!open) {
       setError(null)
       setShowReschedule(false)
+      setShowEdit(false)
       setRescheduleDate('')
       setRescheduleTime('')
       onClose()
@@ -168,6 +224,16 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
             <Badge variant={STATUS_BADGE[lesson.status]}>
               {lesson.status.replace('_', ' ')}
             </Badge>
+          </Row>
+
+          <Row label="Type">
+            {lesson.lesson_type === 'road_test' ? (
+              <Badge variant="outline" className="border-amber-500/50 text-amber-600">
+                Road Test
+              </Badge>
+            ) : (
+              <span className="text-muted-foreground">Regular BTW Lesson</span>
+            )}
           </Row>
 
           <Row label="Student">
@@ -253,10 +319,9 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs">New Date</Label>
-                <Input
-                  type="date"
+                <DatePicker
                   value={rescheduleDate}
-                  onChange={e => setRescheduleDate(e.target.value)}
+                  onChange={setRescheduleDate}
                 />
               </div>
               <div className="space-y-1.5">
@@ -287,8 +352,74 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
           </div>
         )}
 
+        {/* Edit form — pickup/dropoff, notes, instructor */}
+        {showEdit && (
+          <div className="border rounded-lg p-3 space-y-3">
+            <p className="text-sm font-medium">Edit lesson:</p>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Instructor</Label>
+              <Select value={editInstructorId} onValueChange={setEditInstructorId}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {instructors.map((i) => (
+                    <SelectItem key={i.id} value={i.id}>
+                      {getFullName(i.user)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Pickup Location</Label>
+                <Input
+                  value={editPickup}
+                  onChange={e => setEditPickup(e.target.value)}
+                  placeholder="Street address + ZIP"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Dropoff Location</Label>
+                <Input
+                  value={editDropoff}
+                  onChange={e => setEditDropoff(e.target.value)}
+                  placeholder="Street address + ZIP"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs">Additional Notes</Label>
+              <Textarea
+                rows={2}
+                maxLength={150}
+                value={editNotes}
+                onChange={e => setEditNotes(e.target.value)}
+                placeholder="Any special instructions or notes..."
+              />
+            </div>
+            <div className="flex gap-2">
+              <Button size="sm" onClick={handleSaveEdit} disabled={isSavingEdit}>
+                {isSavingEdit && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />}
+                Save
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setShowEdit(false)
+                  setError(null)
+                }}
+              >
+                Go back
+              </Button>
+            </div>
+          </div>
+        )}
+
         {/* Action buttons — only for scheduled lessons */}
-        {isScheduled && !showReschedule && (
+        {isScheduled && !showReschedule && !showEdit && (
           <div className="flex flex-wrap gap-2 pt-1">
             <Button
               size="sm"
@@ -306,6 +437,13 @@ export function LessonDetailDialog({ lesson, onClose }: LessonDetailDialogProps)
               disabled={isMarkingStatus}
             >
               No Show
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={openEdit}
+            >
+              Edit
             </Button>
             <Button
               variant="outline"

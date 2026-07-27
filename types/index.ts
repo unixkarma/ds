@@ -158,6 +158,7 @@ export interface Vehicle {
 // ── Lesson sale origin ───────────────────────────────────────
 export type LessonSoldBy = 'school' | 'instructor'
 export type LessonCancelledBy = 'student' | 'instructor' | 'admin'
+export type LessonType = 'regular' | 'road_test'
 
 // ── Lessons ───────────────────────────────────────────────────
 export interface Lesson {
@@ -169,6 +170,7 @@ export interface Lesson {
   scheduled_at: string
   duration_minutes: number
   status: LessonStatus
+  lesson_type: LessonType
   notes_covered: string
   notes_practice: string
   notes_additional: string
@@ -257,7 +259,7 @@ export interface StudentPurchaseWithRelations extends StudentPurchase {
 
 // ── Student Ledger ───────────────────────────────────────────
 export type LedgerEntryType = 'charge' | 'payment' | 'adjustment'
-export type LedgerPaymentMethod = 'cash' | 'check' | 'other' | 'stripe'
+export type LedgerPaymentMethod = 'cash' | 'check' | 'card' | 'other' | 'stripe'
 
 export interface StudentLedgerEntry {
   id: string

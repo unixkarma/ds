@@ -330,6 +330,7 @@ export function ScheduleClient({
 
       <LessonDetailDialog
         lesson={selectedLesson}
+        instructors={instructors}
         onClose={handleLessonClose}
       />
     </div>

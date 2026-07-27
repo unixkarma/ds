@@ -47,6 +47,7 @@ export async function GET(request: NextRequest) {
 const createLessonSchema = z.object({
   studentId: z.string().uuid(),
   instructorId: z.string().uuid().optional(),
+  lessonType: z.enum(['regular', 'road_test']).default('regular'),
   scheduledAt: z.string().datetime().optional(),
   durationMinutes: z.number().int().min(15).max(240).default(60),
   openingId: z.string().uuid().optional(),
@@ -83,7 +84,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { studentId, vehicleId, notesCovered, notesPractice, notesAdditional, pickupLocation, dropoffLocation, soldBy, openingId } = parsed.data
+  const { studentId, vehicleId, lessonType, notesCovered, notesPractice, notesAdditional, pickupLocation, dropoffLocation, soldBy, openingId } = parsed.data
   const schoolId = profile.school_id
 
   // ── Resolve booking source (opening vs free-form) ───────────
@@ -354,6 +355,7 @@ export async function POST(request: NextRequest) {
       vehicle_id: vehicleId ?? null,
       scheduled_at: scheduledAt,
       duration_minutes: durationMinutes,
+      lesson_type: lessonType,
       notes_covered: notesCovered ?? '',
       notes_practice: notesPractice ?? '',
       notes_additional: notesAdditional ?? '',

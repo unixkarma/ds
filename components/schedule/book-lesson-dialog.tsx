@@ -32,12 +32,14 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { DatePicker } from '@/components/ui/date-picker'
 import type { StudentWithUser, InstructorWithUser, Vehicle } from '@/types'
 
 // All fields z.string() — avoid react-hook-form resolver type conflicts
 const bookLessonSchema = z.object({
   studentId: z.string().min(1, 'Student is required'),
   instructorId: z.string().min(1, 'Instructor is required'),
+  lessonType: z.enum(['regular', 'road_test']),
   date: z.string().min(1, 'Date is required'),
   time: z.string().min(1, 'Time is required'),
   durationMinutes: z.string(),
@@ -75,6 +77,7 @@ export function BookLessonDialog({
     defaultValues: {
       studentId: '',
       instructorId: '',
+      lessonType: 'regular',
       date: defaultDate ?? '',
       time: '09:00',
       durationMinutes: '60',
@@ -84,6 +87,9 @@ export function BookLessonDialog({
       notesAdditional: '',
     },
   })
+
+  const selectedStudentId = form.watch('studentId')
+  const selectedStudent = students.find((s) => s.id === selectedStudentId) ?? null
 
   async function onSubmit(values: BookLessonValues) {
     setIsLoading(true)
@@ -98,6 +104,7 @@ export function BookLessonDialog({
         body: JSON.stringify({
           studentId: values.studentId,
           instructorId: values.instructorId,
+          lessonType: values.lessonType,
           scheduledAt,
           durationMinutes: parseInt(values.durationMinutes, 10),
           vehicleId: values.vehicleId && values.vehicleId !== 'none' ? values.vehicleId : null,
@@ -160,6 +167,19 @@ export function BookLessonDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                  {selectedStudent && (
+                    <p
+                      className={
+                        selectedStudent.lessons_remaining > 0
+                          ? 'text-xs text-muted-foreground'
+                          : 'text-xs text-destructive'
+                      }
+                    >
+                      {selectedStudent.lessons_remaining > 0
+                        ? `${selectedStudent.lessons_remaining} lesson credit${selectedStudent.lessons_remaining === 1 ? '' : 's'} available`
+                        : 'No lesson credits available — student needs to purchase a package'}
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
@@ -191,6 +211,29 @@ export function BookLessonDialog({
               )}
             />
 
+            {/* Lesson Type */}
+            <FormField
+              control={form.control}
+              name="lessonType"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Lesson Type</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="regular">Regular BTW Lesson</SelectItem>
+                      <SelectItem value="road_test">Road Test</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
             {/* Date + Time */}
             <div className="grid grid-cols-2 gap-4">
               <FormField
@@ -200,13 +243,10 @@ export function BookLessonDialog({
                   <FormItem>
                     <FormLabel>Date</FormLabel>
                     <FormControl>
-                      <Input
-                        type="date"
+                      <DatePicker
                         name={field.name}
-                        ref={field.ref}
                         value={field.value}
-                        onChange={(e) => field.onChange(e.target.value)}
-                        onBlur={field.onBlur}
+                        onChange={field.onChange}
                       />
                     </FormControl>
                     <FormMessage />

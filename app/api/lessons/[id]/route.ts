@@ -17,6 +17,7 @@ const updateLessonSchema = z.object({
   // Falls back to the caller's role when omitted.
   cancelledBy: z.enum(['student', 'instructor', 'admin']).optional(),
   scheduledAt: z.string().datetime().optional(),
+  instructorId: z.string().uuid().optional(),
   durationMinutes: z.number().int().min(15).max(240).optional(),
   vehicleId: z.string().uuid().nullable().optional(),
   notesCovered: z.string().max(150).optional(),
@@ -80,15 +81,34 @@ export async function PATCH(
 
   const updates = parsed.data
 
+  // Only an admin may reassign a lesson to a different instructor.
+  if (updates.instructorId !== undefined && profile.role !== 'admin') {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
   // Only an admin may override who a cancellation/reschedule is attributed to
   // (e.g. blame the student to trigger the late fee). An instructor passing
   // cancelledBy is ignored, so they can't dodge their own deduction or charge
   // the student.
   const attributedBy = profile.role === 'admin' ? updates.cancelledBy : undefined
 
-  // If rescheduling, run conflict detection for the new time
-  if (updates.scheduledAt) {
-    const newStart = new Date(updates.scheduledAt)
+  const newInstructorId = updates.instructorId ?? existing.instructor_id
+
+  if (updates.instructorId && updates.instructorId !== existing.instructor_id) {
+    const { data: newInstructor } = await supabase
+      .from('instructors')
+      .select('id')
+      .eq('id', updates.instructorId)
+      .eq('school_id', profile.school_id)
+      .single()
+    if (!newInstructor) {
+      return NextResponse.json({ error: 'Instructor not found' }, { status: 404 })
+    }
+  }
+
+  // If rescheduling or reassigning, run conflict detection for the new time/instructor
+  if (updates.scheduledAt || updates.instructorId) {
+    const newStart = updates.scheduledAt ? new Date(updates.scheduledAt) : new Date(existing.scheduled_at)
     const newDuration = updates.durationMinutes ?? existing.duration_minutes
     const newEnd = new Date(newStart.getTime() + newDuration * 60 * 1000)
     const newPickup = updates.pickupLocation ?? existing.pickup_location
@@ -114,7 +134,7 @@ export async function PATCH(
       const overlaps = exStart < newEnd && exEnd > newStart
 
       if (overlaps) {
-        if (ex.instructor_id === existing.instructor_id) {
+        if (ex.instructor_id === newInstructorId) {
           return NextResponse.json(
             { error: 'Instructor already has a lesson at this time.' },
             { status: 409 }
@@ -133,12 +153,12 @@ export async function PATCH(
     const { data: instructorRecord } = await supabase
       .from('instructors')
       .select('buffer_minutes')
-      .eq('id', existing.instructor_id)
+      .eq('id', newInstructorId)
       .single()
     const bufferMinutes = instructorRecord?.buffer_minutes ?? 0
 
     const sameInstructorToday = (conflicts ?? [])
-      .filter(ex => ex.instructor_id === existing.instructor_id)
+      .filter(ex => ex.instructor_id === newInstructorId)
       .map(ex => {
         const exStart = new Date(ex.scheduled_at).getTime()
         const exEnd = exStart + ex.duration_minutes * 60 * 1000
@@ -195,6 +215,7 @@ export async function PATCH(
     if (updates.status === 'no_show') lessonUpdates.no_show_at = nowIso
   }
   if (updates.scheduledAt !== undefined) lessonUpdates.scheduled_at = updates.scheduledAt
+  if (updates.instructorId !== undefined) lessonUpdates.instructor_id = updates.instructorId
   if (updates.durationMinutes !== undefined) lessonUpdates.duration_minutes = updates.durationMinutes
   if (updates.vehicleId !== undefined) lessonUpdates.vehicle_id = updates.vehicleId
   if (updates.notesCovered !== undefined) lessonUpdates.notes_covered = updates.notesCovered

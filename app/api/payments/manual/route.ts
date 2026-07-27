@@ -34,7 +34,7 @@ const bodySchema = z
     lessonCount: z.number().int().min(1).optional(),
     amountPaidCents: z.number().int().min(0).optional(),
     discountCents: z.number().int().min(0).optional(),
-    paymentMethod: z.enum(['cash', 'check', 'other']),
+    paymentMethod: z.enum(['cash', 'check', 'card', 'other']),
     description: z.string().max(200).nullable().optional(),
     soldBy: z.enum(['operator', 'instructor']).optional(),
     soldByInstructorId: z.string().uuid().optional(),

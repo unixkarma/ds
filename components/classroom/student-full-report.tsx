@@ -5,7 +5,7 @@ import { format, parseISO } from 'date-fns'
 
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { formatCurrency, formatDate, formatDateTime, formatHours, getFullName } from '@/lib/utils'
+import { calculateAge, formatCurrency, formatDate, formatDateTime, formatHours, getFullName } from '@/lib/utils'
 import { toCSV, downloadCSV, type CSVColumn } from '@/lib/csv'
 import type { StudentFullReport } from '@/lib/services/students'
 import type { LessonStatus, ClassroomAttendanceStatus } from '@/types'
@@ -46,6 +46,10 @@ export function StudentFullReportView({ report }: StudentFullReportProps) {
   } = report
 
   const completedBtw = lessons.filter((l) => l.status === 'completed').length
+  const age = student.user.date_of_birth ? calculateAge(student.user.date_of_birth) : null
+  const address = [student.user.address, student.user.city, student.user.state, student.user.zip_code]
+    .filter(Boolean)
+    .join(', ')
   const attendedClassroom = classroomAttendance.filter(
     (r) => r.status === 'present' || r.status === 'late'
   ).length
@@ -131,10 +135,13 @@ export function StudentFullReportView({ report }: StudentFullReportProps) {
           <Pair
             label="Date of birth"
             value={
-              student.user.date_of_birth ? formatDate(student.user.date_of_birth) : '—'
+              student.user.date_of_birth
+                ? `${formatDate(student.user.date_of_birth)}${age !== null ? ` (${age})` : ''}`
+                : '—'
             }
           />
           <Pair label="Age group" value={student.age_group} />
+          <Pair label="Address" value={address || '—'} />
           <Pair label="Status" value={student.status} />
           <Pair
             label="Permit"
@@ -142,7 +149,10 @@ export function StudentFullReportView({ report }: StudentFullReportProps) {
           />
         </Grid>
         {student.notes && (
-          <p className="mt-3 text-sm whitespace-pre-wrap">{student.notes}</p>
+          <div className="mt-3">
+            <p className="text-xs font-medium text-muted-foreground mb-0.5">Account Notes</p>
+            <p className="text-sm whitespace-pre-wrap">{student.notes}</p>
+          </div>
         )}
       </Section>
 
@@ -172,7 +182,7 @@ export function StudentFullReportView({ report }: StudentFullReportProps) {
                 }
               >
                 {balanceCents > 0
-                  ? `Owes ${formatCurrency(balanceCents)}`
+                  ? `Outstanding ${formatCurrency(balanceCents)}`
                   : balanceCents < 0
                   ? `Credit ${formatCurrency(Math.abs(balanceCents))}`
                   : formatCurrency(0)}
@@ -188,10 +198,11 @@ export function StudentFullReportView({ report }: StudentFullReportProps) {
           <Empty>No lessons on record.</Empty>
         ) : (
           <ReportTable
-            headers={['Date & time', 'Instructor', 'Duration', 'Status']}
+            headers={['Date & time', 'Instructor', 'Type', 'Duration', 'Status']}
             rows={lessons.map((l) => [
               formatDateTime(l.scheduled_at),
               getFullName(l.instructor.user),
+              l.lesson_type === 'road_test' ? 'Road Test' : 'Regular',
               formatHours(l.duration_minutes),
               <Badge key={`${l.id}-st`} variant={LESSON_BADGE[l.status]}>
                 {l.status.replace('_', ' ')}
