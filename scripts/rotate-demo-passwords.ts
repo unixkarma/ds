@@ -22,7 +22,7 @@ const admin = createClient(supabaseUrl, serviceRoleKey, {
   auth: { autoRefreshToken: false, persistSession: false },
 })
 
-const NEW_PASSWORD = 'Lemat4444'
+const NEW_PASSWORD = process.env.SEED_PASSWORD || 'ChangeMe123!'
 
 // Explicit allow-list of demo accounts (admins + instructors + students).
 const DEMO_EMAILS = [

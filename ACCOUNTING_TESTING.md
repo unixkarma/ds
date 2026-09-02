@@ -12,8 +12,8 @@ Toda la verificación es **por UI**. No requiere acceso a Supabase ni Stripe Das
 
 | Rol     | Email                       | Password   |
 | ------- | --------------------------- | ---------- |
-| Admin   | `admin63@helixdriving.com`  | `Lemat4444` |
-| Student | `sofia.ramirez@gmail.com`   | `Lemat4444` |
+| Admin   | `admin63@helixdriving.com`  | `$SEED_PASSWORD` |
+| Student | `sofia.ramirez@gmail.com`   | `$SEED_PASSWORD` |
 
 - Calculadora a mano para verificar totales.
 - Para los tests de Stripe (Bloque C), tener tarjeta de prueba Stripe: `4242 4242 4242 4242`, fecha futura, CVC cualquiera, ZIP cualquiera.

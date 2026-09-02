@@ -1,37 +1,96 @@
-..This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# HelixDriving
 
-## Getting Started
+Multi-tenant SaaS for driving schools. Each school manages its instructors,
+students, vehicles, lesson packages and classroom sessions from a single
+dashboard; instructors publish availability and students book lessons against it.
 
-First, run the development server:
+Three portals share one codebase, separated by role:
+
+| Portal | Route | Who |
+| --- | --- | --- |
+| Admin dashboard | `/dashboard` | School staff — students, instructors, payments, reports |
+| Instructor portal | `/instructor` | Schedule, availability templates, earnings, reimbursements |
+| Student portal | `/student` | Book lessons, buy packages, track balance and progress |
+
+## Stack
+
+- **Next.js 16** (App Router, Server Components) + **React 19** + **TypeScript**
+- **Supabase** — Postgres, Auth, Row Level Security, Storage
+- **Tailwind CSS v4** + **shadcn/ui** (Radix primitives)
+- **Stripe** — students paying their school for lesson packages
+- **Lemon Squeezy** — schools paying the platform subscription
+- **Resend** — transactional email
+- **Vercel** — hosting + daily cron
+
+## Getting started
 
 ```bash
+npm install
+cp .env.example .env.local   # fill in the values
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000. The root route redirects to `/login`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Database
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Run the migrations in `supabase/migrations/` in order, via the Supabase
+dashboard SQL editor or the Supabase CLI. They are numbered and meant to be
+applied sequentially — `001_initial_schema.sql` first.
 
-## Learn More
+Optionally load demo data (a school, instructors, students, lessons):
 
-To learn more about Next.js, take a look at the following resources:
+```bash
+SEED_PASSWORD='YourPassword123!' npm run seed
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+The script prints the accounts it creates. `SEED_PASSWORD` defaults to
+`ChangeMe123!` if unset.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Environment variables
 
-## Deploy on Vercel
+All keys are documented inline in [`.env.example`](.env.example). The app will
+not boot without the three Supabase keys and `NEXT_PUBLIC_APP_URL`; email,
+Stripe and Lemon Squeezy features degrade gracefully when their keys are absent.
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+`SUPABASE_SERVICE_ROLE_KEY` bypasses RLS and must never reach the browser — it
+is only read in server-side code and API routes.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-# ds
+## Project layout
+
+```
+app/
+  (auth)/          login, register, password reset
+  (dashboard)/     admin portal
+  (instructor)/    instructor portal
+  (student)/       student portal
+  api/             route handlers (REST-ish, one folder per resource)
+components/
+  ui/              shadcn primitives
+  <feature>/       feature components, mirroring the dashboard sections
+lib/
+  supabase/        client / server / admin / middleware clients
+  services/        data access + business logic, called from server components
+  email/           Resend senders
+types/index.ts     database-mirroring TypeScript types
+supabase/migrations/
+scripts/           seed and maintenance scripts
+```
+
+Business logic lives in `lib/services/`, not in components or route handlers —
+both call into it. Auth and tenant scoping are enforced twice: in middleware
+(`lib/supabase/middleware.ts`) for routing, and in Postgres RLS policies for
+data access.
+
+## Scheduled jobs
+
+`/api/cron/regenerate-openings` runs daily at 08:00 UTC (see `vercel.json`) to
+roll instructor availability templates forward into bookable openings. It
+authenticates with the `CRON_SECRET` bearer token and fails closed without it.
+
+## Testing
+
+Manual QA guides, in Spanish:
+
+- [`TESTING.md`](TESTING.md) — scheduling, templates, openings, cancellations
+- [`ACCOUNTING_TESTING.md`](ACCOUNTING_TESTING.md) — payments, credits, reports

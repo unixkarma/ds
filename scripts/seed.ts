@@ -1,5 +1,5 @@
 // Seed script — populates the database with realistic demo data.
-// Run: npx tsx scripts/seed.ts
+// Run: npm run seed
 //
 // Creates auth users via admin API, then inserts rows into public tables.
 // Idempotent-ish: if the admin email already exists the script fetches their
@@ -43,25 +43,28 @@ function atHour(offsetDays: number, hour: number) {
 }
 
 // ── Config ────────────────────────────────────────────────────────
+// Password for every seeded demo account. Override with SEED_PASSWORD.
+const SEED_PASSWORD = process.env.SEED_PASSWORD || 'ChangeMe123!'
+
 const ADMIN_EMAIL = 'admin@mydrive.com'
-const ADMIN_PASSWORD = 'Lemat4444'
+const ADMIN_PASSWORD = SEED_PASSWORD
 const SCHOOL_NAME = 'My Drive Academy'
 
 const INSTRUCTORS = [
-  { email: 'carlos.martinez@helixdriving.com', password: 'Lemat4444', first: 'Carlos', last: 'Martinez', phone: '+1 312 555 0101', license: 'IL-DI-44821', modality: 'school' as const, hourly: 3500, commission: 0.10, maxPerDay: 8 },
-  { email: 'maria.gonzalez@helixdriving.com', password: 'Lemat4444', first: 'Maria', last: 'Gonzalez', phone: '+1 312 555 0102', license: 'IL-DI-55932', modality: 'school' as const, hourly: 3200, commission: 0.10, maxPerDay: 6 },
-  { email: 'james.wilson@helixdriving.com', password: 'Lemat4444', first: 'James', last: 'Wilson', phone: '+1 312 555 0103', license: 'IL-DI-67043', modality: 'independent' as const, hourly: 0, commission: 0.10, maxPerDay: 7, lessonPrice: 7500 },
+  { email: 'carlos.martinez@helixdriving.com', password: SEED_PASSWORD, first: 'Carlos', last: 'Martinez', phone: '+1 312 555 0101', license: 'IL-DI-44821', modality: 'school' as const, hourly: 3500, commission: 0.10, maxPerDay: 8 },
+  { email: 'maria.gonzalez@helixdriving.com', password: SEED_PASSWORD, first: 'Maria', last: 'Gonzalez', phone: '+1 312 555 0102', license: 'IL-DI-55932', modality: 'school' as const, hourly: 3200, commission: 0.10, maxPerDay: 6 },
+  { email: 'james.wilson@helixdriving.com', password: SEED_PASSWORD, first: 'James', last: 'Wilson', phone: '+1 312 555 0103', license: 'IL-DI-67043', modality: 'independent' as const, hourly: 0, commission: 0.10, maxPerDay: 7, lessonPrice: 7500 },
 ]
 
 const STUDENTS = [
-  { email: 'sofia.ramirez@gmail.com', password: 'Lemat4444', first: 'Sofia', last: 'Ramirez', phone: '+1 312 555 0201', dob: '2007-03-15' },
-  { email: 'liam.chen@gmail.com', password: 'Lemat4444', first: 'Liam', last: 'Chen', phone: '+1 312 555 0202', dob: '2006-11-22' },
-  { email: 'emma.johnson@gmail.com', password: 'Lemat4444', first: 'Emma', last: 'Johnson', phone: '+1 312 555 0203', dob: '2007-06-08' },
-  { email: 'noah.williams@gmail.com', password: 'Lemat4444', first: 'Noah', last: 'Williams', phone: '+1 312 555 0204', dob: '2005-09-30' },
-  { email: 'olivia.brown@gmail.com', password: 'Lemat4444', first: 'Olivia', last: 'Brown', phone: '+1 312 555 0205', dob: '2006-01-17' },
-  { email: 'ethan.davis@gmail.com', password: 'Lemat4444', first: 'Ethan', last: 'Davis', phone: '+1 312 555 0206', dob: '2007-08-04' },
-  { email: 'ava.garcia@gmail.com', password: 'Lemat4444', first: 'Ava', last: 'Garcia', phone: '+1 312 555 0207', dob: '2006-04-25' },
-  { email: 'mason.lee@gmail.com', password: 'Lemat4444', first: 'Mason', last: 'Lee', phone: '+1 312 555 0208', dob: '2005-12-11' },
+  { email: 'sofia.ramirez@gmail.com', password: SEED_PASSWORD, first: 'Sofia', last: 'Ramirez', phone: '+1 312 555 0201', dob: '2007-03-15' },
+  { email: 'liam.chen@gmail.com', password: SEED_PASSWORD, first: 'Liam', last: 'Chen', phone: '+1 312 555 0202', dob: '2006-11-22' },
+  { email: 'emma.johnson@gmail.com', password: SEED_PASSWORD, first: 'Emma', last: 'Johnson', phone: '+1 312 555 0203', dob: '2007-06-08' },
+  { email: 'noah.williams@gmail.com', password: SEED_PASSWORD, first: 'Noah', last: 'Williams', phone: '+1 312 555 0204', dob: '2005-09-30' },
+  { email: 'olivia.brown@gmail.com', password: SEED_PASSWORD, first: 'Olivia', last: 'Brown', phone: '+1 312 555 0205', dob: '2006-01-17' },
+  { email: 'ethan.davis@gmail.com', password: SEED_PASSWORD, first: 'Ethan', last: 'Davis', phone: '+1 312 555 0206', dob: '2007-08-04' },
+  { email: 'ava.garcia@gmail.com', password: SEED_PASSWORD, first: 'Ava', last: 'Garcia', phone: '+1 312 555 0207', dob: '2006-04-25' },
+  { email: 'mason.lee@gmail.com', password: SEED_PASSWORD, first: 'Mason', last: 'Lee', phone: '+1 312 555 0208', dob: '2005-12-11' },
 ]
 
 const VEHICLES = [
@@ -411,7 +414,7 @@ async function main() {
 
   // ─── Done ──────────────────────────────────────────────────────
   console.log('\n--- Seed complete! ---')
-  console.log('\nLogin credentials (all passwords: Lemat4444):')
+  console.log(`\nLogin credentials (all passwords: ${SEED_PASSWORD}):`)
   console.log(`  Admin:       ${ADMIN_EMAIL}`)
   INSTRUCTORS.forEach((i) => console.log(`  Instructor:  ${i.email}`))
   STUDENTS.forEach((s) => console.log(`  Student:     ${s.email}`))

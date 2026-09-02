@@ -1,5 +1,0 @@
-En la seccion de custom record payment en payments, poner un field para colocar detalle donde se explique de que es lo que se esta registrando el pago.
-
-Debemos modificar la funcion de payments y el portal del estudiante para poder colocar balances faltos de pago en la cuenta del estudiante desde el admin. Por ejemplo si el estudiante solo ha pagado la mitad de su paquete que el admin pueda agregar que solo ha pagado ese valor.... Vamos a darte un poco mas de explicacion. Digamos que un admin le anade un paquete al estudiante... a menos que se marque explicitamente que el estudiante ya pago ese valor y la forma en la que lo hizo (check, cash, otro). Si no se explica que ya se pago ese valor entonces eso va a la cuenta del estudiante como un balance pendiente que debera pagar. Tienes esta parte clara?
-
-Esto debe funcionar cuando se anaden paquetes pero tambien debe haber una forma manual de editar el balance del estudiante. Esto debe aparecer en los reportes -> el balance de dinero del estudiante, horas de lecciones usadas horas de lecciones disponibles. 
